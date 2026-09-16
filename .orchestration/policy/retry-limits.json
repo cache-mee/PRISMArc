@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "purpose": "Bounded recovery limits for agents working on salon-app. Read by agents; not enforced by any runtime. Changing a limit is a human decision.",
+  "defaults": {
+    "max_attempts": 3,
+    "require_stated_reason": true,
+    "require_measurable_progress": true,
+    "on_exhaustion": "stop_and_escalate"
+  },
+  "progress_signals": [
+    "failing_test_count_decreased",
+    "failing_test_identity_changed",
+    "error_signature_changed",
+    "failing_assertion_changed"
+  ],
+  "no_progress_definition": "Two consecutive attempts whose failure signal is unchanged by any progress_signal. Re-running an unchanged command is verification, not an attempt.",
+  "limits": {
+    "implementation_fix": { "max_attempts": 3, "on_exhaustion": "stop_and_escalate" },
+    "test_repair": { "max_attempts": 2, "on_exhaustion": "stop_and_escalate" },
+    "review_rework": { "max_attempts": 2, "on_exhaustion": "escalate_to_human" },
+    "environment_setup": { "max_attempts": 2, "on_exhaustion": "stop_and_escalate" },
+    "release_or_deploy": { "max_attempts": 0, "on_exhaustion": "human_gate", "note": "Never retried autonomously." }
+  }
+}

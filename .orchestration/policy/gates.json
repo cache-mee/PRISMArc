@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "purpose": "Consequential or irreversible actions that require a human decision. An agent reaching a required gate MUST stop, and MUST NOT reinterpret it as optional or route around it.",
+  "rules": {
+    "approval_is_per_instance": true,
+    "agent_may_bypass": false,
+    "standing_approval_allowed": false,
+    "on_reach": "stop, write durable state, state exactly what the human must decide and what follows each answer"
+  },
+  "gates": [
+    { "id": "merge", "trigger": "merging a branch into a shared branch, or completing a pull request", "requires": "human_approval" },
+    { "id": "push-to-shared-branch", "trigger": "pushing to main or develop", "requires": "human_approval" },
+    { "id": "release", "trigger": "tagging, publishing or releasing a version", "requires": "human_approval" },
+    { "id": "production-deploy", "trigger": "any deployment to a production environment", "requires": "human_approval" },
+    { "id": "destructive-operation", "trigger": "history rewrite, force push, hard reset, deleting files or branches not created in this work", "requires": "human_approval" },
+    { "id": "irreversible-data-change", "trigger": "schema migration, data backfill, or any change to real booking, customer or payment data", "requires": "human_approval" },
+    { "id": "external-action", "trigger": "sending communications, or calls to third-party services with real-world effect (payments, notifications, calendars)", "requires": "human_approval" },
+    { "id": "dependency-change", "trigger": "adding, removing or upgrading a dependency", "requires": "human_approval" },
+    { "id": "scope-expansion", "trigger": "work beyond the declared scope of the current task", "requires": "human_approval" },
+    { "id": "architecture-change", "trigger": "changing the salon application's architecture, or the orchestration standards in .claude/STANDARDS.md", "requires": "human_approval" }
+  ]
+}

@@ -1,0 +1,29 @@
+# Customization surface for sdlc-planning-workflow.
+#
+# Override files (not edited here):
+#   {project-root}/_bmad/custom/sdlc-planning-workflow.toml         (team)
+#   {project-root}/_bmad/custom/sdlc-planning-workflow.user.toml    (personal)
+
+[workflow]
+
+# Steps to run before the standard activation.
+activation_steps_prepend = []
+
+# Steps to run after the greeting but before Phase 1.
+activation_steps_append = []
+
+# Facts all agents in this workflow keep in mind for the whole run.
+# file: entries are loaded from {project-root}.
+persistent_facts = [
+  "file:{project-root}/**/project-context.md",
+  "file:{project-root}/stack/rules/client-rules.md",
+]
+
+# Where planning artefacts land.
+planning_artifacts = "{project-root}/bmad-output/planning-artifacts"
+
+# Where the stack rules folder lives.
+stack_root = "{project-root}/stack"
+
+# Run on planning complete. Empty for none.
+on_complete = ""

@@ -1,0 +1,34 @@
+# Customization surface for sdlc-dev-workflow.
+#
+# Override files (not edited here):
+#   {project-root}/_bmad/custom/sdlc-dev-workflow.toml         (team)
+#   {project-root}/_bmad/custom/sdlc-dev-workflow.user.toml    (personal)
+
+[workflow]
+
+# Steps to run before standard activation.
+activation_steps_prepend = []
+
+# Steps to run after greeting but before Phase 1.
+activation_steps_append = []
+
+# Facts all agents in this workflow keep in mind for the whole run.
+persistent_facts = [
+  "file:{project-root}/stack/rules/base-rules.md",
+  "file:{project-root}/stack/rules/client-rules.md",
+  "file:{project-root}/**/project-context.md",
+]
+
+# Root for durable run state.
+runs_root = "{project-root}/.orchestration/runs"
+
+# Branch prefix overrides. Defaults are feature/, fix/, chore/.
+# branch_prefix_story = "feature/"
+# branch_prefix_bug   = "fix/"
+# branch_prefix_task  = "chore/"
+
+# Default base branch. Auto-detected from remote if empty.
+default_branch = ""
+
+# Set to false to skip PR creation (e.g. if not using GitHub).
+create_pr = true

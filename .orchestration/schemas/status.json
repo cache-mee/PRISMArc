@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://salon-app/orchestration/schemas/status.json",
+  "title": "Orchestration run status",
+  "description": "Minimal machine-readable execution state for one unit of work, stored at .orchestration/runs/<WORK-ID>/status.json. Deliberately small: this is durable state, not a workflow database or event log.",
+  "type": "object",
+  "required": ["work_id", "status", "current_agent", "current_state", "attempts", "next_action", "updated_at"],
+  "additionalProperties": false,
+  "properties": {
+    "work_id": { "type": "string", "description": "Run identifier; matches the directory name." },
+    "objective": { "type": "string", "description": "One-sentence objective. Full detail lives in handoff.md." },
+    "status": {
+      "type": "string",
+      "enum": ["not_started", "in_progress", "blocked", "awaiting_human", "stopped", "complete"]
+    },
+    "current_agent": {
+      "type": ["string", "null"],
+      "description": "Agent that owns the next action, e.g. lead | test | developer | reviewer | null when awaiting a human."
+    },
+    "current_state": { "type": "string", "description": "Short factual description of where execution actually is." },
+    "attempts": {
+      "type": "array",
+      "description": "One entry per recovery attempt. Bounded by .orchestration/policy/retry-limits.json.",
+      "items": {
+        "type": "object",
+        "required": ["n", "activity", "reason", "failure_signal", "evidence"],
+        "additionalProperties": false,
+        "properties": {
+          "n": { "type": "integer", "minimum": 1 },
+          "activity": { "type": "string", "description": "Key from retry-limits.json, e.g. implementation_fix." },
+          "reason": { "type": "string", "description": "Why this retry was permitted and what changed." },
+          "failure_signal": { "type": "string", "description": "Observed signal; compared across attempts to detect no-progress." },
+          "evidence": { "type": "string", "description": "Path to the evidence record." }
+        }
+      }
+    },
+    "next_action": { "type": "string", "description": "Concrete enough to start immediately." },
+    "gate": {
+      "type": ["object", "null"],
+      "description": "Set when stopped at a human gate; null otherwise.",
+      "required": ["id", "question"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Gate id from .orchestration/policy/gates.json." },
+        "question": { "type": "string", "description": "Exactly what the human must decide." },
+        "requested_at": { "type": "string" }
+      }
+    },
+    "breaker_tripped": {
+      "type": ["string", "null"],
+      "description": "Breaker id from .orchestration/policy/breakers.json, or null."
+    },
+    "escalation": {
+      "type": ["string", "null"],
+      "description": "What a human is being asked to resolve, when escalated."
+    },
+    "evidence_index": {
+      "type": "array",
+      "description": "Paths of evidence records for this run.",
+      "items": { "type": "string" }
+    },
+    "updated_at": { "type": "string" }
+  },
+  "examples": [
+    {
+      "work_id": "SALON-123",
+      "objective": "Prevent double-booking of the same stylist slot.",
+      "status": "in_progress",
+      "current_agent": "developer",
+      "current_state": "Failing test written and confirmed failing; implementation not started.",
+      "attempts": [],
+      "next_action": "Make the failing booking-conflict test pass without altering the test.",
+      "gate": null,
+      "breaker_tripped": null,
+      "escalation": null,
+      "evidence_index": ["evidence/EV-001.md"],
+      "updated_at": "2026-09-03T21:14:07Z"
+    }
+  ]
+}

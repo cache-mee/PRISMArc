@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv --version)",
+      "Bash(uv run:*)",
+      "mcp__claude_ai_Atlassian_Rovo__createJiraIssue"
+    ]
+  }
+}

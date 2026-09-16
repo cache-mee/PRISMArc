@@ -1,0 +1,10 @@
+[workflow]
+activation_steps_prepend = []
+activation_steps_append = []
+
+persistent_facts = [
+  "file:{project-root}/stack/rules/base-rules.md",
+  "file:{project-root}/stack/rules/client-rules.md",
+]
+
+runs_root = "{project-root}/.orchestration/runs"

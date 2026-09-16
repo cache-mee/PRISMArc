@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "purpose": "Explicit, testable circuit breakers. Each trigger is evaluable against .orchestration/runs/<WORK-ID>/status.json and its evidence records. Agents MUST NOT edit this file to get past a breaker.",
+  "enforcement": "convention_only",
+  "enforcement_note": "No runtime evaluates these today. Triggers are written to be checkable so that a future deterministic check can prove a breaker stops execution. That proof does not exist yet.",
+  "breakers": [
+    {
+      "id": "attempt-limit",
+      "trips_when": "status.attempts >= applicable limit in retry-limits.json",
+      "action": "stop_and_escalate"
+    },
+    {
+      "id": "no-progress",
+      "trips_when": "two consecutive attempts share an unchanged failure signal",
+      "action": "stop_and_escalate"
+    },
+    {
+      "id": "scope-expansion",
+      "trips_when": "files changed outside handoff.declared_scope",
+      "action": "stop_and_request_decision"
+    },
+    {
+      "id": "evidence-conflict",
+      "trips_when": "an agent claim of PASS conflicts with an evidence record showing FAIL, or cites evidence that does not exist",
+      "action": "stop_and_escalate"
+    },
+    {
+      "id": "gate-encountered",
+      "trips_when": "an action matches a gate in gates.json",
+      "action": "stop_and_await_human"
+    },
+    {
+      "id": "handoff-insufficient",
+      "trips_when": "a required handoff field is missing, or references an evidence path that does not exist",
+      "action": "stop_and_request_repair"
+    }
+  ]
+}
