@@ -52,10 +52,21 @@ tickets:
   intent parsing has resolved a day-only (no exact time) request, mirroring
   ``confirm_exact_match``'s not-yet-wired-in posture.
 
+- ``present_alternative_for_verification`` — the SM-4b human-verification
+  checkpoint (APPOINTMEN-25) sitting between ``present_nearest_alternatives``'s
+  Story 2.7/FR-8 nearest-alternative reasoning and the point that reasoning
+  would be offered to the Customer. Logs a freshly-produced
+  ``AlternativeSlotSuggestion`` (``app.domain.alternative_slot_verification``)
+  as the observable checkpoint moment and returns it wrapped, unverified, in
+  a ``VerifiedAlternativeSlotSuggestion``. Not customer-visible. A human
+  operator reviews or corrects it before
+  ``app.domain.alternative_slot_verification.require_verified_alternative_slot``
+  will let any downstream "offer to customer" code act on it.
+
 These pieces do not yet call each other — wiring the identity-resolved turn
 loop into intent parsing, the SM-4a checkpoint, and booking
-confirmation/alternatives/day-slot listing is future, out-of-scope work
-(Epic 2/3).
+confirmation/alternatives/day-slot listing/the SM-4b checkpoint is future,
+out-of-scope work (Epic 2/3).
 """
 
 import logging
@@ -66,6 +77,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.booking_intent import BookingIntent
 from app.agent.state import session_store
+from app.domain.alternative_slot_verification import (
+    AlternativeSlotSuggestion,
+    VerifiedAlternativeSlotSuggestion,
+)
 from app.domain.appointments import (
     ResolvedBookingCandidate,
     find_nearest_alternatives,
@@ -240,3 +255,31 @@ async def list_day_slots(
     slots = await list_open_slots_for_day(db, day, staff_name)
     message = render_day_slot_list(day, slots)
     return DaySlotListing(day=day, slots=slots, message=message)
+
+
+def present_alternative_for_verification(
+    suggestion: AlternativeSlotSuggestion,
+) -> VerifiedAlternativeSlotSuggestion:
+    """Surface a freshly-produced ``AlternativeSlotSuggestion`` for the SM-4b checkpoint (APPOINTMEN-25).
+
+    This is the hook point a future conversational Booking Agent loop will
+    call immediately after ``present_nearest_alternatives``'s Story 2.7/FR-8
+    nearest-alternative reasoning, before any "offer alternative to
+    customer" step runs. Not customer-visible — it logs the suggestion as
+    the observable checkpoint moment and returns an unverified
+    ``VerifiedAlternativeSlotSuggestion``; a human operator reviews or
+    corrects it and sets ``verified`` to ``True`` before
+    ``app.domain.alternative_slot_verification.require_verified_alternative_slot``
+    will let it through.
+    """
+    _logger.info(
+        "SM-4b checkpoint - alternative-slot suggestion awaiting human verification: "
+        "requested_time=%r unavailable_reason=%r alternative.service_name=%r "
+        "alternative.start_time=%r alternative.staff_name=%r",
+        suggestion.requested_time,
+        suggestion.unavailable_reason,
+        suggestion.alternative.service_name,
+        suggestion.alternative.start_time,
+        suggestion.alternative.staff_name,
+    )
+    return VerifiedAlternativeSlotSuggestion(suggestion=suggestion)

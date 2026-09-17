@@ -14,10 +14,12 @@ async def get_bookings_for_staff_in_window(
     window_start: datetime,
     window_end: datetime,
 ) -> list[Booking]:
-    """Return staff_id's bookings whose start_time falls in [window_start, window_end).
+    """Return staff_id's non-cancelled bookings whose start_time falls in
+    [window_start, window_end).
 
     Ordered by start_time. Used by the FR-26 conflict-check mechanism
-    (app.domain.conflicts.check_conflicts).
+    (app.domain.conflicts.check_conflicts). A cancelled booking is excluded
+    so a freed slot immediately reads as unoccupied here (FR-11).
     """
     stmt = (
         select(Booking)
@@ -25,6 +27,7 @@ async def get_bookings_for_staff_in_window(
             Booking.staff_id == staff_id,
             Booking.start_time >= window_start,
             Booking.start_time < window_end,
+            Booking.status != "cancelled",
         )
         .order_by(Booking.start_time)
     )
