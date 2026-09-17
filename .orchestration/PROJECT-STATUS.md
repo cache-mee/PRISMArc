@@ -31,6 +31,8 @@
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
 | APPOINTMEN-13 | 1.1 Shared data store entities exist | feature/APPOINTMEN-13-shared-data-store-entities | sdlc-dev-workflow | Phase 4 done (trimmed retrofit), PR #21 needs updating | — | `.orchestration/runs/APPOINTMEN-13/status.md` |
+| APPOINTMEN-16 | 1.4 FR-14: Web Chat Owner/Admin identity resolution | feature/APPOINTMEN-16-owner-admin-identity-resolution | sdlc-dev-workflow | Phase 4 — Code Implementation | — | `.orchestration/runs/APPOINTMEN-16/status.md` |
+| APPOINTMEN-20 | 2.3 FR-13: Staff preference limited to bookable staff | feature/APPOINTMEN-20-23-fr-13-staff-preference-limited-to | sdlc-dev-workflow | Phase 3 — Implementation Plan | — | `.orchestration/runs/APPOINTMEN-20/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
