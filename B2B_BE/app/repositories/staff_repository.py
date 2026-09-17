@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.staff import Staff
+from app.models.staff import Staff, StaffRole
 
 
 async def get_staff_by_phone_number(
@@ -23,3 +23,14 @@ async def get_staff_by_name(db: AsyncSession, name: str) -> Staff | None:
     """
     result = await db.execute(select(Staff).where(Staff.name == name).limit(1))
     return result.scalar_one_or_none()
+
+
+async def list_bookable_staff(db: AsyncSession) -> list[Staff]:
+    """List all bookable Staff rows (FR-7 salon-wide listing).
+
+    Excludes ``StaffRole.OWNER_ADMIN`` (e.g. Ramesh) the same way FR-13
+    already excludes owner/admin staff from Customer-facing staff listings —
+    a business-level filter, not a security boundary.
+    """
+    result = await db.execute(select(Staff).where(Staff.role == StaffRole.STAFF))
+    return list(result.scalars().all())
