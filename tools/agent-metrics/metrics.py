@@ -608,6 +608,24 @@ def cmd_task(a: argparse.Namespace) -> int:
               f"measured under that label, so no cost is shown.")
         samples = []
 
+    # The ledger only ever gets samples from `metrics run` wrapping a child - which never
+    # happens when a project's OTEL_EXPORTER_OTLP_ENDPOINT is already set globally, because
+    # `otel.py`'s wrap phase refuses to hijack an existing collector. In that shape, the
+    # session's telemetry only ever reaches the persistent collector's own log, which has no
+    # ticket label to scope by - so it is joined by time window alone, same as any unlabelled
+    # ledger sample. This never displaces ledger samples; it can only add rows the ledger has
+    # none of, since the two capture paths are mutually exclusive on any one machine.
+    persistent, bridged = [], 0
+    if not samples:
+        persistent_caps = [c for c in discover(getattr(a, "provider_dir", None))
+                           if c["name"] == "otelpersistent"]
+        if persistent_caps and steps:
+            with tempfile.TemporaryDirectory() as td2:
+                _, persistent = _call(persistent_caps[0], "collect",
+                                      {"until": steps[-1]["at"]}, Path(td2))
+            bridged = len(persistent)
+            samples = persistent
+
     print(f"\n{record}")
     print(f"{'#':<3} {'Step':<22} {'Owner':<10} {'Outcome':<13} {'Model':<18} "
           f"{'USD':>7} {'in':>6} {'out':>8} {'cache rd':>10} {'cache cr':>9} "
@@ -658,6 +676,14 @@ def cmd_task(a: argparse.Namespace) -> int:
     elif measured < len(steps):
         print(f"\n[metrics] {len(steps) - measured} of {len(steps)} steps have no cost - "
               "no telemetry overlaps their window.")
+    if bridged:
+        print(f"[metrics] {bridged} sample(s) joined from the persistent OTel collector's "
+              "log, not the ledger - the ledger carried none for this run.\n"
+              "          These are attributed by TIME WINDOW and agent name only; there is "
+              "no ticket label on them.\n"
+              "          A second Claude Code session active on this machine during the same "
+              "window would be\n          indistinguishable from this one. Treat this total "
+              "as an estimate, not an invoice line.")
     return 0
 
 
@@ -1004,6 +1030,41 @@ def self_test() -> int:
                 check("two wrap providers refused", False)
             except SystemExit:
                 check("two wrap providers refused", True)
+
+    print("  caller: cmd_task bridges the persistent collector's log when the ledger is empty:")
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as td:
+        record = Path(td) / "TASK-777.md"
+        record.write_text(
+            "Issue:  777\n"
+            "State:  complete\n\n"
+            "| # | Step | Owner | Outcome | Evidence | At |\n"
+            "|---|---|---|---|---|---|\n"
+            "| 1 | dev | lead | done | commit:aaa | 2026-09-17T16:00:00+00:00 |\n",
+            encoding="utf-8")
+        persistent_log = Path(td) / "otel-sessions.jsonl"
+        persistent_log.write_text(json.dumps({
+            "ts": "2026-09-17T15:30:00+00:00", "session": "s1",
+            "metric": "claude_code.cost.usage", "value": 0.42,
+            "agent": "-", "model": "-", "query_source": "main", "type": None}) + "\n",
+            encoding="utf-8")
+        empty_ledger = Path(td) / "empty-ledger.jsonl"
+        buf = io.StringIO()
+        os.environ["AGENT_METRICS_OTEL_SESSIONS"] = str(persistent_log)
+        try:
+            with contextlib.redirect_stdout(buf):
+                cmd_task(argparse.Namespace(record=str(record), ledger=empty_ledger,
+                                            label_key=None, orchestrator="lead",
+                                            provider_dir=None))
+        finally:
+            del os.environ["AGENT_METRICS_OTEL_SESSIONS"]
+        out = buf.getvalue()
+        check("bridged sample's cost reaches the step table", "0.4200" in out)
+        check("bridging note printed, naming the persistent collector",
+              "persistent OTel collector" in out)
+        check("hyphen-sentinel orchestrator sample was not dropped",
+              "no cost for any step" not in out)
 
     print(f"\n{'PASS' if not fails else 'FAIL: ' + ', '.join(fails)}")
     return 1 if fails else 0

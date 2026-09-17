@@ -59,36 +59,50 @@ def _find_leak(command):
     return None
 
 
+def _block(reason):
+    json.dump({"decision": "block", "reason": reason}, sys.stdout)
+
+
 def main():
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):
-        json.dump({}, sys.stdout)
+        # A malformed/unparseable payload means we cannot verify the command is
+        # safe — fail CLOSED here rather than silently letting it through. This
+        # is the one deliberate exception to this repo's general fail-open hook
+        # philosophy (see .claude/hooks/README.md), because staying silent on a
+        # parse failure would defeat the whole point of this hook.
+        _block(
+            "BLOCKED: secret-leak-guard could not parse its input and is "
+            "failing closed rather than allowing an unchecked command through. "
+            "This is most likely a transient hook error, not a problem with "
+            "your command — simply retry it. If this keeps happening, check "
+            "that the hook is receiving valid JSON on stdin."
+        )
         return
 
-    if data.get("tool_name") != "Bash":
-        json.dump({}, sys.stdout)
-        return
+    try:
+        if data.get("tool_name") != "Bash":
+            json.dump({}, sys.stdout)
+            return
 
-    command = (data.get("tool_input", {}).get("command") or "")
-    if not command:
-        json.dump({}, sys.stdout)
-        return
+        command = (data.get("tool_input", {}).get("command") or "")
+        if not command:
+            json.dump({}, sys.stdout)
+            return
 
-    leak = _find_leak(command)
-    if not leak:
-        json.dump({}, sys.stdout)
-        return
+        leak = _find_leak(command)
+        if not leak:
+            json.dump({}, sys.stdout)
+            return
 
-    var_name, value = leak
-    # Redact the value in the message so the block reason doesn't re-leak it.
-    redacted = command.replace(value, "****")
-    if len(redacted) > 300:
-        redacted = redacted[:300] + "...(truncated)"
+        var_name, value = leak
+        # Redact the value in the message so the block reason doesn't re-leak it.
+        redacted = command.replace(value, "****")
+        if len(redacted) > 300:
+            redacted = redacted[:300] + "...(truncated)"
 
-    json.dump({
-        "decision": "block",
-        "reason": (
+        _block(
             f"BLOCKED: Command embeds the raw value of a sensitive env var (`{var_name}`). "
             f"The value would appear on screen, in the transcript, and in shell history.\n\n"
             f"Use shell variable syntax so the shell expands it at runtime — the display "
@@ -99,8 +113,19 @@ def main():
             f"`tools/env-check/env-check {var_name}` — it reports SET/EMPTY/UNSET and "
             f"never prints the value.\n\n"
             f"Your command (redacted): {redacted}"
-        ),
-    }, sys.stdout)
+        )
+    except Exception as exc:
+        # Any unexpected failure during scanning must not silently allow the
+        # command through — that would be exactly the leak this hook exists to
+        # catch. Fail closed. Keep the error summary generic: it must never
+        # echo raw command text or env values that could themselves be secrets.
+        _block(
+            "BLOCKED: secret-leak-guard hit an internal error while scanning "
+            "this command and is failing closed rather than risking a missed "
+            f"secret leak ({type(exc).__name__}). This is a hook problem, not "
+            "necessarily a problem with your command. Please retry; if it "
+            "persists, report the hook error type above."
+        )
 
 
 if __name__ == "__main__":

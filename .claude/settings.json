@@ -1,13 +1,10 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(gh pr merge *)"
-    ]
+    "allow": []
   },
   "autoMode": {
     "allow": [
-      "$defaults",
-      "Bash(gh pr merge *)"
+      "$defaults"
     ]
   },
   "env": {
@@ -27,6 +24,23 @@
           {
             "type": "command",
             "command": "P=\"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-leak-guard.py\"; if [ -f \"$P\" ]; then \"$(command -v python3 || command -v python)\" \"$P\"; fi",
+            "shell": "bash",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "P=\"$CLAUDE_PROJECT_DIR/.claude/hooks/gate-guard.py\"; if [ -f \"$P\" ]; then \"$(command -v python3 || command -v python)\" \"$P\"; fi",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "P=\"$CLAUDE_PROJECT_DIR/tools/policy-guard/policy-guard.py\"; if [ -f \"$P\" ]; then \"$(command -v python3 || command -v python)\" \"$P\" hook; fi",
             "shell": "bash",
             "timeout": 10
           }
