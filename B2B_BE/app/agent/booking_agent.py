@@ -38,12 +38,18 @@ tickets:
   checkpoint, and an actual availability check have all resolved to one
   candidate slot.
 
-These three pieces do not yet call each other — wiring the identity-resolved
+- ``list_day_slots`` — FR-7's day-only slot listing (APPOINTMEN-23). The
+  hook point a future conversational Booking Agent loop will call once
+  intent parsing has resolved a day-only (no exact time) request, mirroring
+  ``confirm_exact_match``'s not-yet-wired-in posture.
+
+These pieces do not yet call each other — wiring the identity-resolved
 turn loop into intent parsing, the SM-4a checkpoint, and booking confirmation
 is future, out-of-scope work (Epic 2/3).
 """
 
 import logging
+from datetime import date
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +57,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agent.booking_intent import BookingIntent
 from app.agent.state import session_store
 from app.domain.appointments import ResolvedBookingCandidate, render_direct_confirmation
+from app.domain.availability import (
+    OpenSlot,
+    list_open_slots_for_day,
+    render_day_slot_list,
+)
 from app.domain.booking_intent_verification import VerifiedBookingIntent
 from app.domain.identity import resolve_customer_by_phone
 
@@ -158,3 +169,29 @@ def confirm_exact_match(
     """
     message = render_direct_confirmation(candidate)
     return DirectConfirmationPrompt(candidate=candidate, message=message)
+
+
+class DaySlotListing(BaseModel):
+    """The FR-7 day-only slot listing ready to send to the Customer."""
+
+    day: date
+    slots: list[OpenSlot]
+    message: str
+
+
+async def list_day_slots(
+    db: AsyncSession, day: date, staff_name: str | None = None
+) -> DaySlotListing:
+    """List and render a day's open slots for the Customer (FR-7).
+
+    This is the hook point a future conversational Booking Agent loop will
+    call once intent parsing has resolved a day-only (no exact time)
+    request, exactly the same not-yet-wired-in posture ``confirm_exact_match``
+    already has for FR-6. Delegates the actual query/filter logic to
+    ``app.domain.availability.list_open_slots_for_day`` and rendering to
+    ``render_day_slot_list``, returning both as a ``DaySlotListing`` for that
+    future loop to consume.
+    """
+    slots = await list_open_slots_for_day(db, day, staff_name)
+    message = render_day_slot_list(day, slots)
+    return DaySlotListing(day=day, slots=slots, message=message)
