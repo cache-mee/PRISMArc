@@ -40,6 +40,9 @@ async def check_conflicts(
     (no Service entity to derive one from yet), so this checks
     start-time-in-window rather than a true interval overlap — an accepted
     scope boundary, not a true overlap check.
+
+    The returned result must still pass the SM-4c checkpoint
+    (`app.domain.conflict_verification`) before any FR-27/FR-9 write acts on it.
     """
     bookings = await get_bookings_for_staff_in_window(
         db, staff_id=staff_id, window_start=window_start, window_end=window_end

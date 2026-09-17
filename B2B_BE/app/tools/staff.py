@@ -1,8 +1,12 @@
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import SessionLocal
 from app.models.staff import StaffRole
-from app.repositories.staff_repository import get_staff_by_phone_number
+from app.repositories.staff_repository import (
+    get_staff_by_phone_number,
+    list_bookable_staff,
+)
 
 
 class ResolveStaffIdentityInput(BaseModel):
@@ -30,3 +34,14 @@ async def resolve_staff_identity(phone_number: str) -> StaffIdentity | None:
         if staff is None:
             return None
         return StaffIdentity(id=staff.id, name=staff.name, role=staff.role)
+
+
+async def list_bookable_staff_names(session: AsyncSession) -> list[str]:
+    """Tool for the Booking Agent: names of staff who can be booked (FR-13).
+
+    Reads through app.repositories.staff_repository — never queries the DB
+    directly — so the LLM tool-calling layer stays out of the data-access
+    path. Mirrors app.tools.services.get_service_catalog's shape.
+    """
+    staff = await list_bookable_staff(session)
+    return [s.name for s in staff]
