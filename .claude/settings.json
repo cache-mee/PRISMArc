@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "P=\"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-leak-guard.py\"; if [ -f \"$P\" ]; then \"$(command -v python3 || command -v python)\" \"$P\"; fi",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
