@@ -1,0 +1,23 @@
+# .confluence-config.toml — Confluence push configuration
+# Read by sdlc-planning-workflow after Phase 5 (Epics & Stories).
+# Add to .gitignore if your space key or org name is sensitive.
+
+[confluence_config]
+
+# Set to false to skip Confluence push entirely.
+enabled = true
+
+# Your Confluence space key (e.g. "PROJ", "TEAM", "ENG").
+space_key = "AP"
+
+# Optional: Confluence page ID to nest all documents under as child pages.
+# Find the ID in the page URL: .../wiki/spaces/PROJ/pages/123456/...
+# Leave empty to create pages at the space root.
+parent_page_id = ""
+
+# Which planning documents to push. Set individual flags to false to skip.
+push_brief  = true
+push_prd    = true
+push_stack  = true
+push_ux     = true
+push_epics  = true

@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Independently evaluates a salon-app change against acceptance criteria and quality, inspects the Developer's evidence rather than trusting it, identifies defects and risks, and returns PASS or FAIL with evidence. Use when a change needs judgement independent of whoever implemented it.
+description: Independently evaluates a change to the application against acceptance criteria and quality, inspects the Developer's evidence rather than trusting it, identifies defects and risks, and returns PASS or FAIL with evidence. Use when a change needs judgement independent of whoever implemented it.
 tools: Read, Grep, Glob, Bash, Write
 model: inherit
 ---

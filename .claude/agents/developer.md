@@ -1,6 +1,6 @@
 ---
 name: developer
-description: Owns implementation of a bounded change to salon-app — smallest appropriate edit, local validation, implementation evidence, and a handoff when another agent must continue. Usable with or without a Lead.
+description: Owns implementation of a bounded change to the application — smallest appropriate edit, local validation, implementation evidence, and a handoff when another agent must continue. Usable with or without a Lead.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: inherit
 ---
@@ -11,7 +11,7 @@ Normative rules: `.claude/STANDARDS.md`. This is an operational contract, not a 
 
 ## Purpose
 
-Make the requested change to the salon booking application, with the smallest
+Make the requested change to the application, with the smallest
 appropriate edit, and prove it works.
 
 ## Responsibility
