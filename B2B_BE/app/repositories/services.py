@@ -5,7 +5,9 @@ from app.models.service import Service
 
 
 async def list_services(session: AsyncSession) -> list[Service]:
-    result = await session.execute(select(Service).order_by(Service.name))
+    result = await session.execute(
+        select(Service).where(Service.is_active.is_(True)).order_by(Service.name)
+    )
     return list(result.scalars().all())
 
 
@@ -53,6 +55,20 @@ async def update_service(
         service.name = name
     if price is not None:
         service.price = price
+    await db.commit()
+    await db.refresh(service)
+    return service
+
+
+async def deactivate_service(db: AsyncSession, service: Service) -> Service:
+    """Flip an already-fetched Service's ``is_active`` to ``False`` and return it.
+
+    Mirrors ``update_service``'s "already-fetched instance in, mutate,
+    commit, refresh, return" shape. Sets ``service.is_active = False``
+    unconditionally — unlike ``update_service`` there is exactly one thing
+    this function ever does, so no optional-field branching is needed.
+    """
+    service.is_active = False
     await db.commit()
     await db.refresh(service)
     return service
