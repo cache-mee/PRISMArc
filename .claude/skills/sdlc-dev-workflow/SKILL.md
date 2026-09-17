@@ -9,7 +9,13 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 
 ## Conventions
 
-- `{project-root}` is the repository root.
+- `{project-root}` is the **main clone** — never a ticket's worktree, even if this workflow
+  happens to be invoked from inside one. `git rev-parse --show-toplevel` is ambiguous once
+  worktrees exist (it returns whichever checkout you're standing in); the main clone is always
+  the first `worktree` entry in `git worktree list --porcelain`, run from anywhere. Resolve it
+  once at activation and use that absolute path for every `{project-root}`-relative reference
+  below, regardless of which directory subsequent Bash commands `cd`/`-C` into for
+  `{worktree_path}` work.
 - `{ticket}` is the Jira issue key supplied by the user (e.g. `PROJ-42`).
 - `{plans_dir}` resolves to `{worktree_path}/development/plans/` once Phase 2 has created the
   worktree — Phase 1 never touches it, so there's no ordering conflict.

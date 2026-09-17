@@ -9,7 +9,10 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 
 ## Conventions
 
-- `{project-root}` is the repository root.
+- `{project-root}` is the **main clone** — never a ticket's worktree, even if this workflow
+  happens to be invoked from inside one. `git rev-parse --show-toplevel` is ambiguous once
+  worktrees exist; the main clone is always the first `worktree` entry in
+  `git worktree list --porcelain`, run from anywhere. Resolve it once at activation.
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
