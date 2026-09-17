@@ -13,6 +13,9 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill is owned by QA — not t
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
+- `{plans_dir}` resolves to `{project-root}/development/plans/`.
+- `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md` — written by
+  `sdlc-dev-workflow` Phase 3; the ticket's single source of truth. There is no `ticket.md`.
 - `{pr_url}` is the GitHub PR URL for this ticket.
 - Integration tests test **boundaries** — two or more real components working together. They do not mock everything; they mock only external services (third-party APIs, email, payments).
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
@@ -54,6 +57,28 @@ than creating a new file.
   `{run_record}` rather than starting a new one.
 - Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
   note it and continue.
+
+---
+
+## Status Artefacts (workflow-status)
+
+Schema: `.orchestration/schemas/ticket-status.md`.
+
+- After **every** phase and gate reply, update `current.md`'s five fields and `status.md`'s "You
+  Are Here" section and the matching Phase Tracker row for `sdlc-qa-workflow`.
+- Update this ticket's row in `.orchestration/PROJECT-STATUS.md`. While QA is in progress, keep
+  it in the **Active Tickets** table (Current Workflow = `sdlc-qa-workflow`, Phase = the phase
+  just reached, Waiting On = the gate question if pending, else "—"). If no row exists yet
+  (invoked standalone), create one.
+- **On PASS** (Phase 4): move the ticket's row from **Active Tickets** to **Completed Tickets**
+  (Ticket, Summary, Branch, PR, QA Verdict = `PASS`, Completed = today's date). Remove any row
+  for it from **Blocked / Needs Work** if one exists from a prior FAIL.
+- **On FAIL** (Phase 4): keep the row in **Active Tickets** (Waiting On = "developer fix"), and
+  add/update a row in **Blocked / Needs Work** (Blocked At = `sdlc-qa-workflow Phase 4`, Reason =
+  a one-line summary of the failing ACs, Action Required = "fix failing tests, push, re-run
+  `/sdlc-qa-workflow {ticket}`").
+- Never let this slow down or gate the workflow itself. If these files cannot be written, note
+  it and continue.
 
 ---
 
@@ -123,7 +148,7 @@ than creating a new file.
 2. Fetch the PR diff:
    - Run `gh pr diff {pr_url}` or `git diff {default_branch}...{branch_name}`
    - Identify which files changed and what the change does at a high level
-3. Read `{run_dir}/implementation-plan.md` if available — the approved plan describes intended component interactions.
+3. Read `{plan_file}` (`{plans_dir}/{ticket}-implementation-plan.md`) if it exists — the approved plan describes intended component interactions. There is no separate `ticket.md`; the plan file's Ticket Reference section covers that.
 4. Read `stack/rules/base-rules.md` for testing framework, conventions, and what counts as a component boundary in this project.
 5. Produce a brief feature summary saved to `{run_dir}/qa-feature-summary.md`:
    - What the feature does (from the ticket)
@@ -262,16 +287,30 @@ All integration tests passed.
 
 Actions:
   → Jira comment added
-  → Ticket transitioned to: Ready for Merge (or equivalent)
+  → Ticket transitioned to the real terminal (done-category) Jira status
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
 2. Call `mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue`:
    > "QA PASS — {N}/{N} integration tests passed. PR: {pr_url}. Results: {run_dir}/qa-results.md"
 
-3. Call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` → find "Ready for Merge" or "Done" or the closest equivalent.
-4. Call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` to move the ticket.
-5. Update `{run_dir}/status.md` — set `qa: passed`.
+3. Transition Jira to the real terminal status — **match by status category, not by name**:
+   - Call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue`. Status *names* vary per
+     project ("Done", "Ready for UAT", "Ready for Merge", "Released" all exist across different
+     Jira setups) but every one of them reports `to.statusCategory.key`, and only `"done"` means
+     Jira actually counts the issue as finished — `"new"` and `"indeterminate"` do not, even when
+     the status is *named* something that sounds terminal (e.g. a status literally called
+     "QA Done" can still carry `statusCategory.key: "indeterminate"`).
+   - Prefer any available transition whose target `statusCategory.key == "done"`. Call
+     `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` for it.
+   - If no available transition leads directly to a `done`-category status, take the best
+     available transition toward it (an intermediate in-progress status), then call
+     `getTransitionsForJiraIssue` again from the new status and repeat — up to 3 hops total.
+     Stop and report to the user if 3 hops are exhausted without reaching `done`-category, rather
+     than settling for an intermediate status and calling it final.
+   - Record every hop as its own `run-record.md` evidence entry (`jira:transitioned:<status
+     name>`), not just the last one.
+4. Update `{run_dir}/status.md` — set `qa: passed`, per **Status Artefacts** above.
 
 ### On FAIL (one or more tests fail)
 
@@ -298,8 +337,8 @@ Actions:
 ```
 
 2. Call `mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue` with the failure details listed above.
-3. Find and call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` to move the ticket to "Needs Work" or equivalent.
-4. Update `{run_dir}/status.md` — set `qa: failed`.
+3. Find and call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` to move the ticket to "Needs Work" or equivalent — an in-progress-category status, never a `done`-category one.
+4. Update `{run_dir}/status.md` — set `qa: failed`, per **Status Artefacts** above.
 
 The developer must fix the failures and re-raise the PR. QA re-runs `/sdlc-qa-workflow {ticket}` to re-validate.
 
