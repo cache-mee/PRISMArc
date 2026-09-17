@@ -16,6 +16,9 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 - Tests are written **after** implementation — this workflow reads existing code and writes tests for it.
 - A **human gate** means: stop, present the artefact, wait for explicit approval before proceeding.
 - **Bounded recovery:** each phase gets one retry on failure before escalating.
+- Any `started` / `updated` / `last_updated` timestamp written to `current.md` or `status.md` is
+  the real current time, captured by running `date -u +%Y-%m-%dT%H:%M:%S+00:00` — never
+  approximate, and never a date-only value.
 
 ---
 
