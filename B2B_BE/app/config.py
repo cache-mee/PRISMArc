@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = False
     database_url: str | None = None
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-haiku-4-5-20251001"
 
 
 settings = Settings()

@@ -9,13 +9,30 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 
 ## Conventions
 
-- `{project-root}` is the repository root.
+- `{project-root}` is the **main clone** — never a ticket's worktree, even if this workflow
+  happens to be invoked from inside one. `git rev-parse --show-toplevel` is ambiguous once
+  worktrees exist (it returns whichever checkout you're standing in); the main clone is always
+  the first `worktree` entry in `git worktree list --porcelain`, run from anywhere. Resolve it
+  once at activation and use that absolute path for every `{project-root}`-relative reference
+  below, regardless of which directory subsequent Bash commands `cd`/`-C` into for
+  `{worktree_path}` work.
 - `{ticket}` is the Jira issue key supplied by the user (e.g. `PROJ-42`).
-- `{plans_dir}` resolves to `{project-root}/development/plans/`.
+- `{plans_dir}` resolves to `{worktree_path}/development/plans/` once Phase 2 has created the
+  worktree — Phase 1 never touches it, so there's no ordering conflict.
 - `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md`.
 - `{review_file}` resolves to `{plans_dir}/{ticket}-review.md`.
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
+- `{worktree_path}` is set by Phase 2 (via the `worktree-add` skill) — the isolated git
+  worktree where `{branch_name}` actually lives. From Phase 2 onward, every git/build/test/commit
+  command for this ticket's code, and every read/write under `{plans_dir}`, runs with
+  `{worktree_path}` as its working directory, never `{project-root}`. `development/plans/` is
+  git-tracked (not gitignored) precisely so the plan and review files commit and travel with the
+  branch into any worktree or fresh clone — a later session finds them by resolving
+  `{worktree_path}` again via the `worktree-add` skill, not by a fixed project-root path.
+  `{run_dir}` and `PROJECT-STATUS.md` stay anchored to `{project-root}` regardless — they are
+  cross-ticket / resumability aids meant to be visible from the main checkout independent of which
+  ticket's worktree is currently active.
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
 - **Bounded recovery:** each phase gets one retry on failure before escalating to the user.
 - **Commits are granular:** commit after each completed task, not once at the end.
@@ -74,7 +91,8 @@ the project-wide index of active/completed/blocked tickets.
   `sdlc-dev-workflow`, and update this ticket's row in `PROJECT-STATUS.md`'s Active Tickets table
   (Current Workflow = `sdlc-dev-workflow`, Phase = the phase just reached, Waiting On = the gate
   question if one is pending, else "—").
-- Phase 2 sets `status.md`'s `Branch:` field once the branch exists.
+- Phase 2 sets `status.md`'s `Branch:` field once the branch exists, and records `{worktree_path}`
+  in that same Phase 2 Notes cell — a resumed session needs the path, not just the branch name.
 - Phase 5 sets `status.md`'s `PR:` field once the PR is created.
 - On the Phase 6 handoff (see below), set `current.md`'s `waiting` to
   "new session: /sdlc-dev-workflow review {ticket}" and leave the ticket's `PROJECT-STATUS.md`
@@ -115,8 +133,8 @@ the project-wide index of active/completed/blocked tickets.
         │   Read ticket · update status → In Development
         │
         ▼
-  Phase 2: Branch Setup         (git)
-        │   Pull latest · create feature branch · push to remote
+  Phase 2: Branch Setup         (worktree-add skill, git)
+        │   Pull latest · create isolated worktree + feature branch · push to remote
         │
         ▼
   Phase 3: Implementation Plan  (Developer agent)
@@ -195,6 +213,7 @@ Reply with one of:
 ## Phase 2: Branch Setup
 
 **Owner:** Orchestrator (this workflow)
+**Skill:** `worktree-add` (`.claude/skills/worktree-add/SKILL.md`)
 **Tools:** git via Bash
 
 ### Branch naming
@@ -208,11 +227,17 @@ Derive the branch name from the ticket key and summary:
 
 ### Instructions
 
-1. `git checkout {default_branch}` — switch to the default branch.
-2. `git pull origin {default_branch}` — pull latest. If this fails, stop and report.
-3. `git checkout -b {branch_name}` — create the feature branch.
-4. `git push -u origin {branch_name}` — push the empty branch to remote and set upstream.
-5. Confirm the branch exists on remote: `git branch -vv | grep {branch_name}`.
+1. Invoke the `worktree-add` skill with `{branch_name}` (base defaults to `{default_branch}`; pass
+   `--from {default_branch}` explicitly if it was overridden during GitHub Pre-flight). It fetches
+   `origin`, creates `{branch_name}` from `{default_branch}` if it doesn't exist yet, and checks it
+   out into a new isolated worktree. Capture its stdout path as `{worktree_path}`.
+2. If the skill reports a non-zero exit, stop and report per its Failure handling section — do not
+   fall back to a plain `git checkout -b` in `{project-root}`.
+3. `git -C {worktree_path} push -u origin {branch_name}` — push the branch to remote and set
+   upstream (the tool creates the branch and worktree locally but never pushes).
+4. Confirm the branch exists on remote: `git -C {worktree_path} branch -vv | grep {branch_name}`.
+5. From here on, every git/build/test/commit command for this ticket runs with `{worktree_path}`
+   as its working directory — see the `{worktree_path}` convention above.
 
 ---
 
@@ -249,7 +274,7 @@ Present the plan summary to the user, then show the gate prompt:
 
 ```
 ── GATE 3: IMPLEMENTATION PLAN ───────────────────────────────────────────────
-Plan saved at: development/plans/{ticket}-implementation-plan.md
+Plan saved at: {plan_file}
 
 Ticket:  {ticket} — {summary}
 Branch:  {branch_name}
@@ -281,14 +306,17 @@ On `stop`, delete `{plan_file}` if the user requests cleanup, then halt.
 
 ### Instructions
 
-1. Invoke the Developer agent. Pass it the plan file path, coding rules, and ticket summary.
+1. Invoke the Developer agent. Pass it the plan file path, coding rules, ticket summary, and
+   `{worktree_path}` — all file edits, commands and commits for this ticket happen there, not in
+   `{project-root}` (the plan file itself is the one exception: it is read from and, if amended,
+   written back to `{plan_file}` under `{project-root}`).
 2. The Developer agent works through the plan **task by task** in the order defined:
    - Reads the relevant existing code before writing anything.
    - Implements exactly what the plan describes for that task — no additional changes, no unrelated refactors.
    - Runs available lint/test commands (from `CLAUDE.md` stack table or discovered from CI config) after each task.
    - After each task is complete, present the **commit message gate** (see below) before committing.
    - If a task fails after one retry, the Developer agent stops and escalates — it does not skip or silently continue.
-3. After all tasks are committed, run:
+3. After all tasks are committed, run (from `{worktree_path}`):
    ```
    tools/scope-check/scope-check --base {default_branch} --head {branch_name}
    ```
@@ -322,8 +350,8 @@ Reply with one of:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-- On `use`: run `git commit` with the suggested message.
-- On `edit: <message>`: run `git commit` with the user's exact message.
+- On `use`: run `git commit` (from `{worktree_path}`) with the suggested message.
+- On `edit: <message>`: run `git commit` (from `{worktree_path}`) with the user's exact message.
 - On `skip`: continue without committing; remind the user to commit before pushing.
 - Do not commit anything without one of the above responses.
 
@@ -345,7 +373,7 @@ Reply with one of:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-- On `push`: run `git push origin {branch_name}`.
+- On `push`: run `git push origin {branch_name}` from `{worktree_path}`.
 - On `no`: continue to Phase 5.
 - Never run `git push` without this explicit confirmation.
 
@@ -373,7 +401,7 @@ Reply with one of:
    - **Jira Ticket:** link to `{ticket}` on Atlassian
    - **Plan:** path to `{plan_file}`
    - **Test plan:** checklist derived from the plan's testing requirements
-4. Create the PR:
+4. Create the PR (from `{worktree_path}`, so `gh` infers the right repo/branch context):
    ```
    gh pr create \
      --title "{ticket}: {summary}" \
@@ -405,19 +433,21 @@ Implementation is complete and the PR is raised.
   Ticket:   {ticket} — {summary}
   Branch:   {branch_name}
   PR:       {pr_url}
-  Plan:     development/plans/{ticket}-implementation-plan.md
+  Plan:     {plan_file}
 
 To start the code review, open a NEW Claude Code session and run:
   /sdlc-dev-workflow review {ticket}
 
 The Reviewer agent will read the plan, inspect the PR diff, and produce
-development/plans/{ticket}-review.md with a PASS or FAIL verdict.
+{review_file} with a PASS or FAIL verdict.
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
 ### When invoked in review mode (`/sdlc-dev-workflow review {ticket}`)
 
-1. Read `{plan_file}`. If not found, ask the user for the path.
+1. Resolve `{worktree_path}` for `{branch_name}` via the `worktree-add` skill (idempotent — this
+   is a fresh session, so nothing has created or found it yet here). Read `{plan_file}` from
+   inside it. If not found, ask the user for the path.
 2. Get the PR diff: `gh pr diff` (detect PR from branch) or `git diff {default_branch}...{branch_name}`.
 3. Run `tools/scope-check/scope-check --base {default_branch} --head {branch_name}` independently
    — do not trust that Phase 4's check still holds; commits may have been added since. A FAIL
@@ -436,13 +466,15 @@ development/plans/{ticket}-review.md with a PASS or FAIL verdict.
 
 ```
 ── REVIEW FAILED ─────────────────────────────────────────────────────────────
-Review: development/plans/{ticket}-review.md
+Review: {review_file}
 
 CRITICAL issues: {N}  (must fix before merge)
 MAJOR issues:    {N}  (should fix before merge)
 
 To fix and re-review:
-1. Address the CRITICAL and MAJOR issues in the review file.
+1. Address the CRITICAL and MAJOR issues in the review file, in the ticket's worktree
+   ({worktree_path} — re-run the `worktree-add` skill with {branch_name} if this is a fresh
+   session and the path isn't already known).
 2. Commit fixes to branch {branch_name}.
 3. Push: git push origin {branch_name}
 4. Re-run: /sdlc-dev-workflow review {ticket}
@@ -461,7 +493,7 @@ review passing and the ticket being genuinely finished. Reaching a `done`-catego
 
 ```
 ── REVIEW PASSED ─────────────────────────────────────────────────────────────
-Review: development/plans/{ticket}-review.md
+Review: {review_file}
 
 The PR is ready to merge, but QA has not run yet.
   PR:     {pr_url}
@@ -491,7 +523,8 @@ Reply with one of:
 
 ## Plans Directory Structure
 
-`{plans_dir}` = `development/plans/`
+`{plans_dir}` = `{worktree_path}/development/plans/` — inside the ticket's worktree, not the main
+checkout.
 
 ```
 development/
@@ -502,11 +535,14 @@ development/
 
 **One plan file per ticket. No separate `ticket.md`.**
 The plan file contains the ticket reference, branch, acceptance criteria, and all tasks — it is
-the single source of truth for ticket context, and other workflows (`sdlc-unit-test-workflow`,
-`sdlc-qa-workflow`) MUST read it from this exact path, not from a `{run_dir}`-relative guess.
-`current.md`/`status.md` under `.orchestration/runs/{ticket}/` are also maintained (see
-**Status Artefacts** above) — they are resumability aids read by `workflow-status`, not a
-second copy of the plan's content.
+the single source of truth for ticket context. `development/plans/` is git-tracked, so these files
+commit and travel with `{branch_name}`. Other workflows (`sdlc-unit-test-workflow`,
+`sdlc-qa-workflow`) MUST get there by resolving `{worktree_path}` for `{branch_name}` via the
+`worktree-add` skill first, then reading `{plans_dir}` inside it — never by guessing a
+`{project-root}`-relative path, and never from a `{run_dir}`-relative guess.
+`current.md`/`status.md` under `{project-root}/.orchestration/runs/{ticket}/` are also maintained
+(see **Status Artefacts** above) — they stay in the main checkout, are resumability aids read by
+`workflow-status`, and are not a second copy of the plan's content.
 
 ---
 
