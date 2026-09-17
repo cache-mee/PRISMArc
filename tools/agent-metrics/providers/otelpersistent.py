@@ -3,7 +3,8 @@ r"""Provider: cost and tokens for sessions the throwaway `otel` provider cannot 
 back from the persistent collector's own log.
 
     otelpersistent.py capabilities
-    otelpersistent.py collect --request <file.json>      # request may carry {"until": <iso>}
+    otelpersistent.py collect --request <file.json>      # request may carry {"since": <iso>,
+                                                           #                    "until": <iso>}
     otelpersistent.py --self-test
 
 PHASE: query. It reads a durable artifact - the persistent collector's log - and needs no
@@ -43,9 +44,17 @@ WHAT THIS CANNOT DO, AND WHY THAT IS NOT A BUG IN THIS FILE
     The persistent log carries no ticket, task or owner label - it is captured before
     `metrics` ever sees the session, so there is nothing to label it with. Attribution here is
     therefore time-window and agent-name only, exactly like `cost_in_window` already does for
-    unlabelled ledger samples. Concretely:
+    unlabelled ledger samples. `collect()` accepts `since` for exactly this reason: without a
+    lower bound, "the window" silently means "everything the collector has ever logged, up to
+    `until`" - which for a run's FIRST step (no earlier step to bound it) is every session on
+    this machine since the collector started, not that step's work. Passing `since` narrows the
+    read to the step's own half-open window, `(since, until]`, matching `cost_in_window`'s own
+    convention so a sample on a boundary is never double-counted across adjacent steps. A step
+    with no earlier step still has no real floor - that is a fact about the run record, not
+    something this file can invent - so callers should treat an unbounded first step's number
+    as an upper-bound estimate, not a measurement. Concretely:
 
-      - `metrics task <record>` works: a run record supplies the window to join by.
+      - `metrics task <record>` works: a run record supplies the window to join by, per step.
       - `metrics report --where ticket=X` does NOT gain this data, and must not be wired to
         it: there is no window to join by outside of a run record, and no label to filter on.
         Attempting it would silently fold an unrelated concurrent session into the total.
@@ -100,6 +109,7 @@ def collect(req: dict, log_path: Path | None = None) -> list[dict]:
         log_path or default_log())
     if not path.exists():
         return []
+    since = req.get("since")
     until = req.get("until")
     rows = []
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -113,6 +123,10 @@ def collect(req: dict, log_path: Path | None = None) -> list[dict]:
         if row.get("metric") not in (COST_METRIC, TOKEN_METRIC):
             continue
         ts = row.get("ts") or ""
+        # Half-open (since, until]: a sample exactly on `since` belongs to the step that was
+        # closing, not the one about to open - same boundary rule as `cost_in_window`.
+        if since and ts <= since:
+            continue
         if until and ts > until:
             continue
         rows.append({"provider": NAME, "kind": "sample", "ts": ts,
@@ -174,6 +188,14 @@ def self_test() -> int:
 
         scoped = collect({"until": "2026-09-17T18:00:00+00:00"}, log_path=log)
         check("`until` excludes samples after the window", len(scoped) == 3)
+
+        floored = collect({"since": "2026-09-17T16:41:00+00:00"}, log_path=log)
+        check("`since` excludes samples at or before the bound", len(floored) == 3
+              and all(r["ts"] > "2026-09-17T16:41:00+00:00" for r in floored))
+
+        windowed = collect({"since": "2026-09-17T16:41:00+00:00",
+                            "until": "2026-09-17T16:59:00+00:00"}, log_path=log)
+        check("`since` and `until` together give a half-open window", len(windowed) == 2)
 
         env_path = Path(td) / "elsewhere.jsonl"
         env_path.write_text(json.dumps(lines[0]) + "\n", encoding="utf-8")
