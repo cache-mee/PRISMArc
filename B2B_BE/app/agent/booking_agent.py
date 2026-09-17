@@ -30,16 +30,32 @@ tickets:
   checkpoint, and an actual availability check have all resolved to one
   candidate slot.
 
-These two pieces do not yet call each other — wiring the identity-resolved
-turn loop into intent parsing and booking confirmation is future,
+- ``present_nearest_alternatives`` — FR-8's nearest-alternative(s) message
+  (APPOINTMEN-24). The hook point a future conversational Booking Agent
+  loop will call instead of ``confirm_exact_match`` once intent parsing and
+  the SM-4a checkpoint have determined the Customer's named exact time did
+  not resolve directly — it names the reason the requested time is
+  unavailable (already booked or blocked) and at least one concrete,
+  bookable alternative, so a rejected exact-time request never dead-ends
+  the conversation.
+
+These pieces do not yet call each other — wiring the identity-resolved turn
+loop into intent parsing and booking confirmation/alternatives is future,
 out-of-scope work (Epic 2/3).
 """
+
+from datetime import datetime
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.state import session_store
-from app.domain.appointments import ResolvedBookingCandidate, render_direct_confirmation
+from app.domain.appointments import (
+    ResolvedBookingCandidate,
+    find_nearest_alternatives,
+    render_alternative_slots,
+    render_direct_confirmation,
+)
 from app.domain.identity import resolve_customer_by_phone
 
 _ASK_PHONE_NUMBER = "Could I get your phone number to pull up your account?"
@@ -120,3 +136,33 @@ def confirm_exact_match(
     """
     message = render_direct_confirmation(candidate)
     return DirectConfirmationPrompt(candidate=candidate, message=message)
+
+
+async def present_nearest_alternatives(
+    db: AsyncSession,
+    *,
+    service_name: str,
+    requested_time: datetime,
+    staff_name: str | None = None,
+) -> str:
+    """Present the FR-8 nearest-alternative(s) message for an unavailable exact time.
+
+    This is the FR-8 counterpart to ``confirm_exact_match`` (FR-6) — the
+    hook point a future conversational Booking Agent loop will call once
+    intent parsing (FR-5) and the SM-4a checkpoint have determined the
+    Customer's named exact time did not resolve directly. Calls
+    ``find_nearest_alternatives`` to resolve the candidate staff set, the
+    unavailability reason, and up to two nearest free alternative slots,
+    then ``render_alternative_slots`` to turn that into the Customer-facing
+    message. Raises ``StaffNotFoundError`` or ``NoAlternativeSlotFoundError``
+    exactly as ``find_nearest_alternatives`` does — no wiring into a live
+    conversational loop exists yet (see the APPOINTMEN-24 implementation
+    plan's Technical Context).
+    """
+    result = await find_nearest_alternatives(
+        db,
+        service_name=service_name,
+        requested_time=requested_time,
+        staff_name=staff_name,
+    )
+    return render_alternative_slots(result, service_name)
