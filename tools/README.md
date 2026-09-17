@@ -8,9 +8,17 @@ Shared deterministic tools for developing and maintaining **salon-app**.
 |---|---|---|
 | `agent-metrics/` | Measures per-agent-run cost, tokens and process facts (rework, human interventions, outcome) | Run manually by developers; `runrecord` is read by the `sdlc-*-workflow` skills' Run Record steps |
 | `worktree-add/` | Creates an isolated git worktree with standard symlinks | The `worktree-add` skill |
-| `scope-check/` | Fails if a change touches both `B2B_BE/` and `B2B_FE/` | Enforces CLAUDE.md's Repository layout rule; run manually, from the local pre-commit hook (`.githooks/pre-commit`), and in CI (`.github/workflows/scope-check.yml`) |
+| `scope-check/` | Fails if a change touches both `B2B_BE/` and `B2B_FE/` | Enforces CLAUDE.md's Repository layout rule; run manually, from the local pre-commit hook (`.githooks/pre-commit`), in CI (`.github/workflows/scope-check.yml`), explicitly in `sdlc-dev-workflow` Phase 4/6, and delegated to by `policy-guard check-scope` for pre-write enforcement |
 | `env-check/` | Reports whether an env var is `SET`/`EMPTY`/`UNSET` without ever printing its value | Pointed to by `.claude/hooks/secret-leak-guard.py`'s block message as the safe way to check a credential is configured |
-| `_lib/` | Shared helpers (git/path utilities, config-table parsing) used by `worktree-add`, `scope-check` and `env-check` | All of the above |
+| `policy-guard/` | Mechanically enforces the backend/frontend scope boundary at write time — delegates to `scope-check`, extended to cover everything already touched in the working tree | Wired as a `PreToolUse` hook in `.claude/settings.json` for the `Write\|Edit` matcher |
+| `breaker-check/` | Evaluates `.orchestration/policy/breakers.json` / `retry-limits.json` (and, with `--ticket`, `budget-limits.json` against the `agent-metrics` ledger) against a run's `status.json`; `record-attempt` is the deterministic writer for that file's `attempts[]` | Called by `.claude/agents/lead.md` and all four `sdlc-*-workflow` skills' Bounded Recovery steps, before granting any retry |
+| `_lib/` | Shared helpers (git/path utilities, config-table parsing) used by `worktree-add`, `scope-check`, `env-check`, `policy-guard` and `breaker-check` | All of the above |
+
+Bash-command gates (`merge`, `push-to-shared-branch`, `destructive-operation`,
+`release`, `dependency-change`) are enforced separately by
+`.claude/hooks/gate-guard.py` — a Claude Code hook, not a `tools/` script,
+since it only runs as a `PreToolUse` lifecycle hook rather than being invoked
+by any skill. See `.claude/hooks/README.md`.
 
 None of these arrived through the "two or more skills need it" rule below in
 the strict sense — they're general-purpose developer tools ported/installed

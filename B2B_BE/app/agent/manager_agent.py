@@ -34,6 +34,28 @@ not-yet-resolved session it calls ``resolve_speaker``/``render_identity_greeting
 a match; on an already-resolved session it now (APPOINTMEN-55 Task 7) calls
 ``run_manager_turn`` instead of returning a static placeholder.
 
+APPOINTMEN-51 (WhatsApp channel-parity NFR, ``whatsapp-deltas.md`` §2) rewords
+``render_proposed_service_change_restatement``'s closing question (stories
+4.1-4.3) from the open-ended "Shall I confirm this?" to an explicit yes/no
+("Reply YES to confirm or NO to cancel."), mirroring APPOINTMEN-50's fix to
+``app.domain.appointments.render_direct_confirmation``. APPOINTMEN-51 also
+independently added its own ``render_proposed_availability_change_restatement``
+/ ``present_proposed_availability_change_for_confirmation`` pair (story 3.4,
+FR-27), built in parallel with and merged concurrently to APPOINTMEN-55's own
+version of the former. APPOINTMEN-55's implementation is kept as the single
+``render_proposed_availability_change_restatement`` definition below — it is
+the one actually called by ``app.tools.availability_change.propose_availability_change``
+and exercised end-to-end through the wired loop (Task 6/7) — while
+``present_proposed_availability_change_for_confirmation`` is kept from
+APPOINTMEN-51 as an additional, still-unwired hook mirroring
+``present_proposed_service_change_for_confirmation``'s existing pattern.
+**Flagged, not silently fixed:** the two tickets' restatement copy differs —
+APPOINTMEN-55's ends in an open-ended "Shall I confirm this?" while
+APPOINTMEN-51's sibling functions use the explicit "Reply YES to confirm or
+NO to cancel." framing; reconciling that copy inconsistency is out of scope
+for this merge (it would require rewriting APPOINTMEN-55's own passing tests)
+and is left for a follow-up.
+
 APPOINTMEN-55 (FR-25/FR-27, Manager Agent conversational loop) adds
 ``render_proposed_availability_change_restatement`` — the restate half of the
 FR-27 restate-then-confirm sequence for a pending ``ProposedAvailabilityChange``,
@@ -264,14 +286,17 @@ def render_proposed_service_change_restatement(
     its own "at least one of new_name/new_price" shape); ``ProposedServiceDeletion``
     restates the ``service_id`` being removed, since that is all the type carries —
     resolving it to a service name would require a DB lookup, out of scope here (see
-    the APPOINTMEN-40 plan's Risks). Every branch ends in an explicit ask for
-    confirmation. Pure function, no I/O, no DB access — matches the style of this
-    module's ``render_identity_greeting``/``describe_speaker``.
+    the APPOINTMEN-40 plan's Risks). Every branch ends with an explicit yes/no
+    framing ("Reply YES to confirm or NO to cancel."), per ``whatsapp-deltas.md``
+    §2 (APPOINTMEN-51) — the same fix APPOINTMEN-50 applied to
+    ``render_direct_confirmation``. This is a shared, channel-agnostic renderer
+    with no ``channel`` parameter. Pure function, no I/O, no DB access — matches
+    the style of this module's ``render_identity_greeting``/``describe_speaker``.
     """
     if isinstance(proposed, ProposedService):
         return (
             f"You're adding a new service: {proposed.name!r} at "
-            f"{proposed.price!r}. Shall I confirm this?"
+            f"{proposed.price!r}. Reply YES to confirm or NO to cancel."
         )
     if isinstance(proposed, ProposedServiceEdit):
         changes = []
@@ -282,11 +307,11 @@ def render_proposed_service_change_restatement(
         change_text = " and ".join(changes)
         return (
             f"You're editing service {proposed.service_id!r}: changing "
-            f"{change_text}. Shall I confirm this?"
+            f"{change_text}. Reply YES to confirm or NO to cancel."
         )
     return (
         f"You're removing service {proposed.service_id!r} from the catalog. "
-        "Shall I confirm this?"
+        "Reply YES to confirm or NO to cancel."
     )
 
 
@@ -341,6 +366,33 @@ def present_proposed_service_change_for_confirmation(
         proposed,
     )
     return render_proposed_service_change_restatement(proposed)
+
+
+def present_proposed_availability_change_for_confirmation(
+    change: ProposedAvailabilityChange,
+) -> str:
+    """Surface a freshly-restated availability change for the FR-27 checkpoint.
+
+    Mirrors ``present_proposed_service_change_for_confirmation``'s existing shape
+    exactly: this is the hook point a future conversational Manager Agent loop
+    will call immediately after a ``ProposedAvailabilityChange`` has been built
+    (e.g. from ``build_proposed_availability_change``), before any call to
+    ``confirm_and_apply_availability_change`` (``app.domain.availability``). It
+    logs the restated proposal as the observable checkpoint moment and returns
+    the restatement text from ``render_proposed_availability_change_restatement``
+    for a future conversational loop to send to the staff member, whose explicit
+    yes/no is then recorded (setting ``confirmed=True``) before
+    ``confirm_and_apply_availability_change`` will let the write through. This
+    is a new, still-unwired hook point — consistent with every other function in
+    this module — not a call-site wiring change; no endpoint or webhook file is
+    touched.
+    """
+    _logger.info(
+        "FR-27 checkpoint - proposed availability change awaiting human "
+        "confirmation: %r",
+        change,
+    )
+    return render_proposed_availability_change_restatement(change)
 
 
 async def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:

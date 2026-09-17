@@ -302,16 +302,26 @@ trigger evaluable against durable state, and an action.
 | `evidence-conflict` | a claim of PASS conflicts with evidence of FAIL | stop, escalate |
 | `gate-encountered` | a human gate is reached | stop, await human |
 | `handoff-insufficient` | required handoff fields missing or referencing missing paths | stop, request repair |
+| `budget-exceeded` | cumulative ticket cost exceeds `.orchestration/policy/budget-limits.json`'s ceiling | stop, escalate |
 
 - A tripped breaker MUST stop the current line of work.
 - An agent MUST NOT edit policy files to get past a breaker. Changing a limit is
   a human decision and a separate change.
 - Any new breaker MUST come with a way to evaluate it from durable state.
 
-**Honest limitation:** nothing in this repository *enforces* these files today —
-they are read and obeyed by agents. The architecture is deliberately shaped so
-that a future check can evaluate a breaker from `status.json` and prove it stops
-execution. That proof does not exist yet, and MUST NOT be claimed.
+**Mechanical enforcement.** `tools/breaker-check` evaluates `attempt-limit`,
+`no-progress`, `evidence-conflict`, `gate-encountered`, `handoff-insufficient`
+and `budget-exceeded` against a run's `status.json` (and, for the budget
+breaker, `tools/agent-metrics`) — a deterministic pass/fail, not an agent's
+own say-so. `status.json` is written by `breaker-check record-attempt`
+(never by hand — a malformed hand-edit would break every later check), called
+from `.claude/agents/lead.md` and all four `sdlc-*-workflow` skills before any
+retry is granted. Separately, `.claude/hooks/gate-guard.py` mechanically blocks
+the Bash-detectable subset of human gates (`merge`, `push-to-shared-branch`,
+`destructive-operation`, `release`, `dependency-change`) before the command
+ever runs. `scope-expansion`, `production-deploy`, `external-action` and
+`architecture-change` remain judgement calls no regex or state check can make
+— those still depend on an agent recognising them and a human deciding.
 
 ---
 
