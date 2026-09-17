@@ -45,7 +45,8 @@ ticket-scoped, since planning runs before any ticket exists.
   Name`), `Owner` = `business-analyst` / `product-manager` / `architect` / `ux-designer` for a
   phase, or exactly `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`,
   `Evidence` = the artefact path just produced (or `approved` / `revise` for a gate), `At` =
-  now, ISO-8601.
+  now, ISO-8601 — get the real current time by running `date -u +%Y-%m-%dT%H:%M:%S+00:00`;
+  never approximate or pad to midnight.
 - When Phase 7 (or the last enabled phase) completes, set `State: complete`. On a `stop` reply
   at any gate, set `State: stopped` instead.
 - When Phase 7 pushes tickets to Jira, record each created ticket key in that row's `Evidence`

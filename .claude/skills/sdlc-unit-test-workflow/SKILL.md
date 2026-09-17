@@ -41,7 +41,9 @@ than creating a new file.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[unit-test] Phase N — Name` (or `[unit-test] Gate N — Name`), `Owner` = `test`, or exactly
   `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` =
-  `commit:<sha>` / `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601.
+  `commit:<sha>` / `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601 — get the real
+  current time by running `date -u +%Y-%m-%dT%H:%M:%S+00:00`; never approximate or pad to
+  midnight.
 - Do not advance `State` past `unit-testing` — `sdlc-qa-workflow` is what moves it to `qa`.
 - Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
   note it and continue.

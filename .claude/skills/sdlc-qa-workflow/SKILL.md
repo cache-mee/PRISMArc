@@ -42,7 +42,8 @@ than creating a new file.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[qa] Phase N — Name` (or `[qa] Gate N — Name`), `Owner` = `test`, or exactly `human` for a
   gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` /
-  `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601.
+  `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601 — get the real current time by
+  running `date -u +%Y-%m-%dT%H:%M:%S+00:00`; never approximate or pad to midnight.
 - On QA **PASS** (Phase 4), set `State: complete` — this is the row that closes the ticket's
   whole SDLC journey across all three development-side workflows.
 - On QA **FAIL** (Phase 4), keep `State: qa` and set `Next:` to name the failing tests the
