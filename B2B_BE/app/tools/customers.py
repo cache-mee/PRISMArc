@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import SessionLocal
 from app.domain.customers import find_or_create_customer
 
 
@@ -19,9 +19,7 @@ class CustomerRecord(BaseModel):
     name: str
 
 
-async def identify_or_create_customer_tool(
-    args: IdentifyOrCreateCustomerArgs, session: AsyncSession
-) -> CustomerRecord:
+def identify_or_create_customer_tool(args: IdentifyOrCreateCustomerArgs) -> CustomerRecord:
     """Identify an existing Customer by phone number, or create a new one.
 
     This is the in-process tool seam a future Booking Agent registers to
@@ -29,10 +27,17 @@ async def identify_or_create_customer_tool(
     delegates the lookup-or-create business rule to
     ``app.domain.customers.find_or_create_customer``, and maps the returned
     ``Customer`` ORM object to the decoupled ``CustomerRecord`` response shape.
+
+    Opens its own session via SessionLocal since this is an in-process,
+    LLM-callable tool with no request-scoped session available to it.
     """
-    customer = await find_or_create_customer(session, args.phone_number, args.name)
-    return CustomerRecord(
-        id=customer.id,
-        phone_number=customer.phone_number,
-        name=customer.name,
-    )
+    db = SessionLocal()
+    try:
+        customer = find_or_create_customer(db, args.phone_number, args.name)
+        return CustomerRecord(
+            id=customer.id,
+            phone_number=customer.phone_number,
+            name=customer.name,
+        )
+    finally:
+        db.close()
