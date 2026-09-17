@@ -39,8 +39,8 @@
 PRISM is two things, layered together:
 
 1. An **agent-orchestrated SDLC** — BA, PM, Architect, UX Designer, Developer,
-   Test and Reviewer sit on fixed workflow pipelines; Lead and Security are
-   invoked ad hoc. Each agent knows its domain and hands off cleanly to the
+   Test and Reviewer sit on fixed workflow pipelines; Lead, Security and
+   Deploy are invoked ad hoc. Each agent knows its domain and hands off cleanly to the
    next.
 2. Underneath it, a **deterministic execution harness** — Claude Code hooks
    and standalone tools that constrain what those agents can actually do to
@@ -187,7 +187,7 @@ NEXT AGENT DECISION
 ║                                                                  ║
 ║   ◈ LAYER 2 — AGENTS  (the role players)                         ║
 ║   BA · PM · Architect · UX · Developer · Test · Reviewer          ║
-║   Lead / Security — invoked ad hoc, outside any one phase         ║
+║   Lead / Security / Deploy — invoked ad hoc, outside any one phase ║
 ║                                                                  ║
 ║   ◈ LAYER 3 — CAPABILITY SKILLS  (bounded, reusable capabilities) ║
 ║   bmad-product-brief · bmad-prd · bmad-architecture · bmad-ux    ║
@@ -305,7 +305,8 @@ planning_artifacts: "bmad-output/planning-artifacts"
 salon-app/
 ├── .claude/
 │   ├── agents/              — Role agents (BA, PM, Architect, UX, Developer, Reviewer, QA)
-│   │                           + Lead (ad-hoc coordination), Security (OWASP audits)
+│   │                           + Lead (ad-hoc coordination), Security (OWASP audits),
+│   │                           Deploy (verified local deploys)
 │   ├── hooks/                — Harness enforcement: gate-guard.py, secret-leak-guard.py
 │   ├── skills/               — Workflow skills (sdlc-*-workflow) + capability skills
 │   └── STANDARDS.md         — Normative operating rules (MUST / MUST NOT)
