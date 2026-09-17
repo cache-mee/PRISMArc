@@ -47,10 +47,13 @@ Rules every agent MUST follow:
    frontend, or both — from its stated component/label/type first, and from
    what the acceptance criteria actually change (API/DB/service logic →
    backend; UI/client behaviour → frontend) if none is stated.
-2. **Confine every file to the matching folder.** All files created or edited
-   for a backend ticket MUST live under `B2B_BE/`; all files for a frontend
-   ticket MUST live under `B2B_FE/`. Do not create a new top-level folder for
-   application code, and do not place backend files in `B2B_FE/` or vice versa.
+2. **Confine every file to the matching folder, including what you read.**
+   All files created or edited for a backend ticket MUST live under
+   `B2B_BE/`; all files for a frontend ticket MUST live under `B2B_FE/`. Root
+   every search, glob, and directory read in the classified folder from the
+   first tool call — do not browse the other folder "just to check." Do not
+   create a new top-level folder for application code, and do not place
+   backend files in `B2B_FE/` or vice versa.
 3. **Split cross-cutting tickets.** A ticket that genuinely touches both (e.g.
    a new endpoint plus the UI that calls it) MUST be treated as two bounded
    changes, one per folder — not one change that reaches across both.
@@ -61,6 +64,11 @@ Rules every agent MUST follow:
 
 This governs every agent that reads or writes application code — Developer,
 Test, Reviewer, and Architect alike.
+
+**Mechanical enforcement.** Rule 2 is checked, not just stated: run
+`tools/scope-check/` against a change before calling it finished (or wire it
+into CI/a pre-commit hook) — it fails if a single diff touches both `B2B_BE/`
+and `B2B_FE/`. See `tools/scope-check/README.md`.
 
 ## How Claude Code works in this repository
 
