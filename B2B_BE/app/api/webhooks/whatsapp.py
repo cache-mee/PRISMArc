@@ -16,6 +16,13 @@ flow below. No identity-resolution logic is forked here either — both
 ``resolve_and_greet_speaker`` and ``booking_agent.handle_message`` are called
 unchanged.
 
+APPOINTMEN-55 Task 7 extends the ``resolve_and_greet_speaker`` call with the
+already-available ``db`` (the request-scoped ``AsyncSession``) and ``Body``
+(the inbound message text) so its already-``manager_resolved`` branch can run
+the Manager Agent's bounded tool-calling loop (``run_manager_turn``) — a
+one-line pass-through of already-available data into an existing shared call,
+not new WhatsApp-specific business logic.
+
 No Twilio webhook signature verification (``X-Twilio-Signature``) is done
 here — explicitly out of scope for this ticket (see the APPOINTMEN-48
 implementation plan's Security Considerations / Out of Scope). No outbound
@@ -68,7 +75,9 @@ async def whatsapp_webhook(
     Strips the ``whatsapp:`` prefix from ``From`` to get the sender's raw
     phone number, derives a deterministic ``session_id`` from it, and tries
     Staff/Owner resolution first (``manager_agent.resolve_and_greet_speaker``,
-    FR-14/FR-24): a match short-circuits with the role-based greeting and
+    FR-14/FR-24, now also passed ``db`` and ``Body`` per APPOINTMEN-55 Task 7):
+    a match short-circuits with the role-based greeting (first turn) or the
+    Manager Agent conversational loop's reply (every subsequent turn), and
     ``booking_agent.handle_message`` is not called for that turn. No match
     falls through to the shared ``booking_agent.handle_message`` with that
     phone number supplied out-of-band — so identity resolution never asks a
@@ -78,7 +87,9 @@ async def whatsapp_webhook(
     phone_number = _strip_whatsapp_prefix(From)
     session_id = f"whatsapp:{phone_number}"
 
-    reply = await manager_agent.resolve_and_greet_speaker(session_id, phone_number)
+    reply = await manager_agent.resolve_and_greet_speaker(
+        session_id, phone_number, db, Body
+    )
     if reply is None:
         reply = await booking_agent.handle_message(
             db, session_id, Body, phone_number=phone_number
