@@ -6,6 +6,8 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.config import settings
+from app.models.base import Base
+from app.models.customer import Customer  # noqa: F401 — registers Customer on Base.metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -16,9 +18,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# No SQLAlchemy models exist yet (app/models/ is still empty) — autogenerate
-# support is wired up once Story 1.1 adds entities.
-target_metadata = None
+target_metadata = Base.metadata
 
 # The DB URL always comes from app.config.settings (env-derived), never from
 # a hard-coded alembic.ini value.
