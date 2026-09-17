@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "purpose": "Per-ticket cost ceilings, evaluated by tools/breaker-check against tools/agent-metrics report output when --ticket is given. Changing a ceiling is a human decision, not an agent one.",
+  "enforcement": "Read by tools/breaker-check's budget-exceeded check. Soft-skipped (never a hard failure) if tools/agent-metrics or its ledger is unavailable — this is a cost-observability control, not a security control, and must not block work when the measurement tool itself can't run.",
+  "defaults": {
+    "warn_usd": 5.0,
+    "ceiling_usd": 15.0,
+    "on_ceiling_exceeded": "stop_and_escalate"
+  }
+}

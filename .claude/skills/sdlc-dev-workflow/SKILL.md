@@ -104,6 +104,47 @@ the project-wide index of active/completed/blocked tickets.
 
 ---
 
+## Bounded Recovery (status.json + breaker-check)
+
+Schema: `.orchestration/schemas/status.json`. `{run_dir}/status.json` is the machine-readable
+companion to this workflow's own `current.md`/`status.md`/`run-record.md` — it exists so
+`.orchestration/policy/retry-limits.json` and `breakers.json` can be evaluated against durable
+state instead of an agent's own say-so. Unlike `current.md`/`status.md`, it is **not** updated on
+every phase transition — it is created on first use of this section and updated only at
+retry/failure points.
+
+This wires into the two bounded-recovery points already named in this file: the "each phase gets
+one retry on failure before escalating" convention above, and Phase 4's "If a task fails after one
+retry, the Developer agent stops and escalates" line. Concretely, at the moment a failure is being
+retried (not the first attempt):
+
+1. Record the attempt — do not hand-edit `status.json`; a malformed edit would make every later
+   `breaker-check` call fail with exit 2. Run:
+   ```
+   tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} \
+     --activity implementation_fix --reason "<why this retry is warranted>" \
+     --failure-signal "<observed failure signature>" --evidence "<path to evidence>"
+   ```
+   Use `--activity environment_setup` instead for Phase 3 plan revision / pre-flight-type issues.
+   This creates `{run_dir}/status.json` on first use (per its schema) and appends to `attempts[]`
+   on every call after.
+2. Run, from `{project-root}` (this tool always runs against the main clone's `.orchestration/`,
+   same as every other `{run_dir}`-anchored artefact in this file — never `{worktree_path}`):
+   ```
+   tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}
+   ```
+3. **Exit 0:** proceed with the retry as already described in Phase 4's text.
+4. **Exit 1:** stop — do not attempt the retry. Present `breaker-check`'s printed output verbatim
+   to the user as the reason, per this file's Stop Conditions.
+
+Passing `--ticket {ticket}` also makes `breaker-check` evaluate cumulative ticket cost against
+`.orchestration/policy/budget-limits.json` (if present) — so this same invocation point is also
+this workflow's cost-budget check. No separate metrics-wrapping step is needed: `tools/agent-metrics`
+telemetry already flows automatically via the OTEL collector configured in `.claude/settings.json`,
+and `breaker-check` reads it on demand.
+
+---
+
 ## On Activation
 
 1. Ask the user: "Which Jira ticket are you starting work on?" if a ticket key was not supplied with the invocation.
@@ -567,7 +608,9 @@ The Developer agent MUST NOT invoke `bmad-quick-dev` (deprecated), `bmad-dev-sto
 - GitHub pre-flight fails and the user does not resolve the issue.
 - A required source file or artefact does not exist on disk.
 - The Developer agent exhausts its retry limit without producing output.
-- A lint or test run fails after one retry.
+- A lint or test run fails after one retry — see **Bounded Recovery** above: a retry beyond that
+  point requires a clean `tools/breaker-check/breaker-check` exit (0); a non-zero exit stops the
+  retry and surfaces the tripped breaker's output verbatim.
 - `tools/scope-check/` reports a violation (the change touches both `B2B_BE/` and
   `B2B_FE/`) — resolved only by re-planning the ticket as two bounded changes, never by
   overriding the check.
