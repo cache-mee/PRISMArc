@@ -139,9 +139,16 @@ retried (not the first attempt):
 
 Passing `--ticket {ticket}` also makes `breaker-check` evaluate cumulative ticket cost against
 `.orchestration/policy/budget-limits.json` (if present) — so this same invocation point is also
-this workflow's cost-budget check. No separate metrics-wrapping step is needed: `tools/agent-metrics`
-telemetry already flows automatically via the OTEL collector configured in `.claude/settings.json`,
-and `breaker-check` reads it on demand.
+this workflow's cost-budget check, IF `tools/agent-metrics` has cost to give it. It currently does
+not, for this workflow: `breaker-check` calls `metrics report --where ticket={ticket}`, which reads
+only `.agent-metrics/ledger.jsonl`, and rows only land there from `metrics run` wrapping an
+invocation with `--label ticket=...` — which nothing in this workflow does. The OTEL collector
+configured in `.claude/settings.json` captures real telemetry (confirmed via `metrics task
+{run_record}`, which joins it by time window), but that path carries no ticket label, so `--where
+ticket={ticket}` cannot see it; `breaker-check` prints `budget-exceeded: SKIP (agent-metrics
+unavailable: ...)` rather than a real check. Until a step here wraps its `claude` invocation with
+`metrics run --label ticket={ticket}`, treat this cost-budget check as not wired up, and do not
+report it to the user as an enforced gate.
 
 ---
 
