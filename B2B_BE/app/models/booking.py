@@ -9,10 +9,13 @@ from app.models.base import Base
 class Booking(Base):
     """A confirmed appointment booking.
 
-    ``service_name`` is a plain string, not a foreign key, because no
-    Service entity exists yet (APPOINTMEN-13) — a deliberate, documented
-    simplification to be reconciled with a ``service_id`` FK once that
-    entity lands.
+    ``service_id`` (APPOINTMEN-13) is nullable and additive: existing rows
+    are backfilled by matching ``service_name`` against ``services.name``
+    where possible, but an unmatched historical row keeps ``service_id`` as
+    NULL rather than a guessed value. ``service_name`` itself is left in
+    place — ``app.repositories.bookings.create_booking`` is the sole insert
+    path for this table and still writes it — replacing it is a separate,
+    larger refactor out of this ticket's scope.
     """
 
     __tablename__ = "bookings"
@@ -23,6 +26,9 @@ class Booking(Base):
     )
     staff_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("staff.id"), nullable=False
+    )
+    service_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("services.id"), nullable=True
     )
     service_name: Mapped[str] = mapped_column(String, nullable=False)
     start_time: Mapped[datetime] = mapped_column(
