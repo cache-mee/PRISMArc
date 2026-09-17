@@ -30,7 +30,7 @@
 
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — |
+| APPOINTMEN-13 | 1.1 Shared data store entities exist | feature/APPOINTMEN-13-shared-data-store-entities | sdlc-dev-workflow | Phase 4 done (trimmed retrofit), PR #21 needs updating | — | `.orchestration/runs/APPOINTMEN-13/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
