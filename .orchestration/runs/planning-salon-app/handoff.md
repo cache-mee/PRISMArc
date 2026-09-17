@@ -4,45 +4,149 @@
 planning-salon-app
 
 ## Objective
-Produce a PRD-ready product brief for the full pivot of salon-app to a single-business, conversational Agentic Appointment Management Engine (hackathon scope), so the Architect and UX Designer can begin Phase 3 work without reconstructing this session's discovery.
+Hand off the finalized UX specification for the Booking Agent (Web Chat + WhatsApp), Manager Agent (Web
+Chat + WhatsApp), and Owner Dashboard to the Architect and Developer agents, so Phase 5 (epics/stories,
+implementation) can begin without re-deriving interaction design from the PRD alone.
 
 ## Acceptance Criteria
-1. `brief.md` and `addendum.md` exist at `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/`, covering discovery (domain, personas, stakes, risks), and every assumption tagged `[ASSUMPTION]` with a resolution-status entry in the log.
-2. Every open item from the source brief's own §10, the stack-pivot-vs-approved-stack conflict, the B2B_BE/B2B_FE repo-layout conflict, and the MCP-vs-direct-tool-calling choice are explicitly captured as open, not silently resolved.
-3. No architecture, technical, or UX decision has been made unilaterally by this pass — all such items are recorded as open questions for the Architect/UX Designer.
+1. The Architect/Developer can begin epic/story breakdown and implementation directly from the four UX
+   artefacts below plus the PRD and `stack/rules/base-rules.md`, without needing to ask the UX Designer
+   or the human anything this handoff already answers.
+2. Every UX-driven open question is named explicitly, with its owner, so nothing is silently treated as
+   resolved that isn't.
+3. No designed flow implies a role can reach a tool/action its role-scoped registry would not expose
+   (verified against PRD §4.2/§4.3 and addendum.md §1's role matrix at design time — see Decisions below).
 
 ## Current State
-Brief and addendum drafted and written to disk (Create intent, first pass, not yet reviewed by the human). `.memlog.md` seeded and populated for this run's discovery. This is Phase 1 of the planning workflow (`business-analyst` step per `.orchestration/runs/planning-salon-app/run-record.md`); Gate 1 (human review of the brief) has not yet occurred — it is the immediate next step, owned by whoever launched this agent, not by this agent.
+Phase 4 (UX Design) is **done** for this pass. Four UX specification files are written and internally
+consistent with the approved PRD (`status: final`) and the locked stack
+(`stack/rules/base-rules.md`, `status: approved`). No Design Approval gate has been recorded yet in
+`run-record.md`/`workflow-status.md` — per this workflow's established pattern (Gate 1/2/3 each required
+explicit human sign-off before the next phase started), a human gate for these UX artefacts should be
+expected before Phase 5 begins in earnest, consistent with `workflow-status.md`'s "Design Approval —
+pending" row. This UX pass does not self-validate its own output as gate-cleared (per this agent's scope
+boundary: "Accepting its own UX as validated without a separate review pass" is explicitly not owned by
+the UX Designer).
 
 ## Completed
-- Read and incorporated the user's finalized project-brief document (Agentic Appointment Management Engine — Salon Edition) and the prior-session architecture-discussion notes, both supplied verbatim as this run's source input.
-- Read `stack/stack-proposal.md` and confirmed it records the backend/mobile stack as "fixed by founder decision... not open for re-evaluation at MVP" (Node.js/Express + Flutter mobile + Postgres) — directly conflicting with the newly discussed Flutter+FastAPI+Postgres pivot. See `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/addendum.md` §2.4 item 1 and the resolution log row 4.
-- Produced `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/brief.md` (distilled, ~2 pages) and `addendum.md` (persona depth, full technical-considerations discussion, risks, and a 12-row assumptions/open-questions resolution log).
-- Seeded and populated `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/.memlog.md`.
+- **`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/customer-booking-chat.md`** — Web Chat,
+  Customer / Booking Agent. Entry point, component/state inventory, turn-by-turn structure for identity
+  resolution (FR-1/FR-2), catalog browse (FR-4), all three booking-resolution branches (FR-6/FR-7/FR-8),
+  confirmation (FR-9), history (FR-10), cancel (FR-11), reschedule (FR-12); privacy/accessibility notes;
+  4 recorded design decisions with rationale and alternatives; 2 forwarded open questions.
+- **`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/staff-owner-manager-chat.md`** — Web Chat,
+  Staff/Owner / Manager Agent. Entry point (separate internal route from the Customer widget), identity
+  resolution (FR-14/FR-24), Staff availability block/unblock with conflict-named response (FR-25–FR-27),
+  Owner catalog add/edit/delete (FR-15–FR-18), a role-boundary interaction rule covering FR-21–FR-23 and
+  FR-28–FR-30; privacy/accessibility notes; 4 recorded design decisions; 2 forwarded open questions.
+- **`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/owner-dashboard.md`** — the one
+  traditional screen. Full layout: top bar (Today/Week toggle, Live indicator), Staff list panel
+  (Meena/Arjun only, per confirmed PRD Decision 1 that Ramesh is not staff), Bookings panel (Today = two
+  staff columns, Week = day×staff table), live-update behavior (FR-32) with no manual refresh control;
+  privacy/accessibility notes; 3 recorded design decisions; 1 forwarded open question (Dashboard access
+  gating — unspecified in the PRD).
+- **`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/whatsapp-deltas.md`** — channel-delta
+  notes for both agents: identity-question skip (FR-3, FR-24), plain-text-only rendering in place of Web
+  Chat's structured chips/cards/buttons, and an explicit statement of what does NOT change (intent
+  parsing, resolution logic, conflict detection, role boundaries — per the channel-parity NFR, PRD §7,
+  and the "no per-channel forking" rule in `stack/rules/base-rules.md`); 1 recorded design decision
+  (plain-text-only given Twilio Sandbox, not a production WhatsApp Business Account); 1 forwarded open
+  question.
+- Every design decision with non-obvious rationale is recorded inline (what/why/alternatives) and rolled
+  up into a per-file "Decision Record Summary" table, per this agent's evidence expectations.
+- Privacy-sensitive elements are explicitly documented with the information boundary enforced: FR-10's
+  own-bookings-only filter (customer chat), FR-29's no-cross-staff-visibility boundary (manager chat), and
+  the Dashboard's deliberate omission of customer phone numbers (dashboard).
 
 ## Failed / Unresolved
-- 12 assumptions/open questions are logged in `addendum.md` §4; none resolved in this pass beyond what the source material itself already settled. Highest-priority: the stack-pivot-vs-founder-locked-stack conflict (row 4) and Ramesh's bookable-provider status (row 1) — both require a human/stakeholder decision, not an Architect inference.
-- The `.memlog.md` for this brief was hand-authored to match the `memlog.py` schema/format rather than produced by invoking the script, because no Bash/shell execution tool was available in this agent's toolset for this run. Content and format should match what the script would have produced, but this is a process deviation worth noting, not silent evidence.
+Nothing failed. The following are UX-driven open questions/scope implications, explicitly not resolved
+here per this agent's scope boundary against making architecture/product-scope decisions:
+
+1. **SM-4a/SM-4b/SM-4c UI hook (Architect/Developer decision).** PRD §8's three human-verification
+   checkpoints are, per this spec, deliberately designed with **zero Customer/Staff/Owner-visible UI
+   change** — the conversation reads as uninterrupted regardless of whether a human reviewed the
+   intermediate step. Whether the demo needs any operator-facing hook at all (e.g., a presenter-only panel
+   showing raw parsed intent / conflict outcome with an approve-or-edit control) or whether a
+   terminal/log-based demonstration is sufficient for judging is **not decided in this spec** — it is a
+   build-time demo-mechanism decision belonging to the Architect/Developer. See
+   `customer-booking-chat.md` §3.4/§7, `staff-owner-manager-chat.md` §3.3/§8.
+2. **Dashboard access gating (Architect decision).** The PRD's auth-minimalism NFR (§7) covers the
+   conversational agents' phone-lookup identity only; it is silent on how (or whether) the `/dashboard`
+   route itself is restricted to Ramesh. This spec does not invent an authentication screen. See
+   `owner-dashboard.md` §1, §6.
+3. **Twilio WhatsApp Sandbox capability check (Architect/Developer decision).** This spec defaults every
+   WhatsApp choice/confirm point to plain text, on the grounds that Sandbox mode (not a production WhatsApp
+   Business Account, per `stack/rules/base-rules.md`) may not reliably support interactive quick-reply
+   buttons within the 24-hour window. If Sandbox is confirmed to support them reliably, the Architect/
+   Developer may choose to use them without needing a new UX pass — the underlying choice/confirm content
+   is unchanged either way. See `whatsapp-deltas.md` §1, §4.
+4. **PM-informational, non-blocking:** `customer-booking-chat.md` §3.6 designs cancel (FR-11) without a
+   pre-write confirm gate, unlike booking/catalog/availability writes (FR-9/18/27) — because FR-11's
+   stated consequences do not include one. Flagged in case the PM wants explicit symmetry added as a
+   scope decision; not built into this spec as a requirement it doesn't have.
+5. **Non-blocking design-consistency note:** `staff-owner-manager-chat.md` §3.2/§8 flags that Staff
+   conflict handling only *names* a conflict (per FR-26) rather than *suggesting an alternative* the way
+   the Booking Agent does for Customers (FR-8) — not designed as a feature since no Staff-facing FR asks
+   for it; noted as a possible future consistency improvement, not a gap in this pass.
 
 ## Constraints
-- Scope: this brief covers product requirements discovery only. No architecture, technical implementation, or UX/interaction decisions were made — all such items are recorded as open questions for the Architect and UX Designer, per this agent's scope boundaries.
-- `CLAUDE.md`'s `B2B_BE/`/`B2B_FE/` repository split is authoritative for all application code the Architect and Developer later produce; the brief flags (does not resolve) the conflict between that split and the sketched `backend/app/...` package layout.
-- `stack/stack-proposal.md` is an existing, approved, founder-locked document; it is not this agent's place to override it — flagged for human sign-off before the Architect proceeds on the new stack direction.
+- `CLAUDE.md`'s `B2B_BE/`/`B2B_FE/` split remains authoritative for all application code the Architect and
+  Developer produce; the UX artefacts above describe behavior/component states only and make no
+  implementation-technology choices (framework internals, state management) beyond what
+  `stack/rules/base-rules.md` already locks.
+- This UX spec is happy-flow-only, per PRD §5/§6.2/§7 — no defensive/ambiguous-input UI beyond the ordinary
+  component states every chat/dashboard surface needs regardless of input quality (e.g., an empty booking
+  history, a disabled button after one tap). This is called out explicitly per file (each file's §4/edge
+  cases section) so it is checkable, not assumed.
+- Role-based permission enforcement (Owner/Admin vs. Staff vs. Customer, addendum.md §1) is treated as a
+  hard product constraint: `staff-owner-manager-chat.md` §5 designs the *conversational manifestation*
+  (short, plain redirect copy) of a boundary whose actual enforcement is architectural (role-scoped tool
+  registries, `stack/rules/base-rules.md`) — the UX spec does not claim to be the enforcement mechanism
+  itself.
+- `stack/rules/base-rules.md` remains locked; nothing in this UX pass proposes changing it. Where this
+  spec assumes a specific route/component location (e.g., `B2B_FE/src/chat/`, `B2B_FE/src/dashboard/`),
+  it is citing the already-enforced layout, not proposing a new one.
 
 ## Decisions
-- None taken unilaterally at the architecture/technical/UX level. The one confirmed technical item (the agent-to-tool pattern: agent calls the backend's own registered functions, never touches the DB directly) was already confirmed by the user in the prior session, not decided by this brief.
+- Every design decision made in this UX pass (11 total across the four files) is recorded inline with
+  rationale and alternatives considered, and rolled up per file in a "Decision Record Summary" table —
+  see each file's final section before "Open Questions Forwarded."
+- No product-scope or architecture decision was made by this agent. Where a UX requirement bordered on a
+  scope or architecture question (the four items in Failed/Unresolved above), it was recorded as an open
+  question rather than resolved unilaterally, per this agent's scope boundary.
 
 ## Evidence
-- `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/brief.md` — the distilled product brief.
-- `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/addendum.md` — persona depth, technical considerations, risks, and the assumptions/open-questions resolution log (§4).
-- `bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/.memlog.md` — chronological record of this run's discovery and assumption-flagging (hand-authored; see Failed/Unresolved above).
-- `stack/stack-proposal.md` — existing approved stack document, cited as the source of the founder-lock conflict.
+- `bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/customer-booking-chat.md`
+- `bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/staff-owner-manager-chat.md`
+- `bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/owner-dashboard.md`
+- `bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/whatsapp-deltas.md`
+- `bmad-output/planning-artifacts/prd/prd-salon-app-2026-09-17/prd.md` — source FRs/UJs every flow above
+  traces to.
+- `stack/rules/base-rules.md` — the locked stack/layout this spec designs against.
+- `.orchestration/runs/planning-salon-app/artifacts/handoff-phase3-stack-to-ux.md` — the superseded
+  PM/Architect → UX handoff, retained for trail continuity.
 
 ## Next Action
-Human reviews `brief.md` and `addendum.md` at Gate 1. On approval: the Architect begins Phase 3 by first resolving, or escalating for human sign-off, the stack-pivot conflict (addendum §2.4 item 1 / log row 4) and the repo-layout conflict (item 3 / row 7), since both block a coherent technical design; the UX Designer begins by reading the persona depth and role-permission matrix in `addendum.md` §1 to scope the chat and dashboard interaction patterns, noting that Ramesh's bookable-provider status (row 1) and the "web chat" frontend-technology ambiguity (item 7 / row 12) are both still open and may affect UX scope.
+- **Human (Design Approval gate, expected per `workflow-status.md`):** review the four UX artefacts above,
+  in particular the 5 open questions in Failed/Unresolved, before Phase 5 (Epics & Stories) proceeds.
+- **Architect:** confirm or decide items 1–3 in Failed/Unresolved (SM-4a/b/c UI hook mechanism, Dashboard
+  access gating, WhatsApp Sandbox interactive-button feasibility) as part of epic/story breakdown; none of
+  the three blocks the *content* of any designed conversation turn, only how/whether an operator-facing
+  or auth mechanism wraps around it.
+- **Developer (once epics/stories exist):** build the Web Chat widget, Manager Agent route, and Dashboard
+  against the four UX files above and `stack/rules/base-rules.md`'s enforced `B2B_FE/src/{chat,dashboard,
+  shared,api}/` layout; the shared `Confirm/Cancel action pair`, message bubble, and typing-indicator
+  components are designed once and reused across the Customer and Manager Agent chat surfaces (see
+  `staff-owner-manager-chat.md` §4's cross-reference).
 
 ## Completion Condition
-This handoff is satisfied once the Architect has an explicit answer (or an explicit human escalation) for each open item in `addendum.md` §4 that blocks its own work, and the UX Designer has confirmed the persona/permission material is sufficient to begin interaction design.
+This handoff is satisfied once the Architect/Developer have either (a) resolved items 1–3 in
+Failed/Unresolved as part of Phase 5 planning, or (b) explicitly deferred them with a recorded decision,
+and epics/stories exist that reference the four UX artefacts above by path for every Customer/Staff/Owner-
+facing story.
 
 ## Escalation
-Rows 1, 2, 4, and 11 of the assumptions/open-questions log in `addendum.md` §4 require a human/stakeholder decision (Ramesh's bookable-provider status; whether to track any KPIs; the stack-pivot-vs-founder-locked-stack conflict; the specific human-verification moment to showcase). None of these has been escalated to the human yet beyond being surfaced in this handoff and in the brief itself — that escalation is the immediate next step at Gate 1.
+No UX requirement was found to be technically contradictory, and no privacy constraint from the brief was
+found unmeetable within stated scope — no escalation is raised by this pass. Items 1–3 in
+Failed/Unresolved are routine Architect/Developer decisions, not escalations requiring a human beyond the
+already-expected Design Approval gate.
