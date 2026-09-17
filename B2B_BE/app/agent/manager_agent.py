@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from app.agent.availability_intent import parse_availability_change
 from app.domain.availability import ProposedAvailabilityChange
+from app.domain.dashboard_access import decline_staff_dashboard_request
 from app.models.staff import StaffRole
 from app.tools.staff import resolve_staff_identity
 
@@ -60,3 +61,15 @@ def build_proposed_availability_change(
     explicit confirmation is Story 3.3, not built here.
     """
     return parse_availability_change(message, staff_name=speaker.name, now=now)
+
+
+def respond_to_dashboard_request(speaker: SpeakerContext) -> str | None:
+    """Consult the FR-29 guard for an already-resolved Manager Agent speaker.
+
+    Hook point a future conversational Manager Agent loop calls once an incoming message has
+    been classified as asking for the staff list, another staff member's schedule, or
+    dashboard-equivalent data (that classification step does not exist yet — see the FR-29
+    implementation plan's Out of Scope). Returns the decline string to send back verbatim when
+    not ``None``; returns ``None`` when the request should proceed (Owner/Admin).
+    """
+    return decline_staff_dashboard_request(speaker.role)
