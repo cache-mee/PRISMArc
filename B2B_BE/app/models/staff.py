@@ -21,7 +21,12 @@ class Staff(Base):
         String, unique=True, index=True, nullable=False
     )
     role: Mapped[StaffRole] = mapped_column(
-        Enum(StaffRole, name="staff_role"), nullable=False
+        Enum(
+            StaffRole,
+            name="staff_role",
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(UTC), nullable=False

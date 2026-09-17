@@ -23,7 +23,7 @@ staff_table = sa.table(
     "staff",
     sa.column("name", sa.String()),
     sa.column("phone_number", sa.String()),
-    sa.column("role", sa.String()),
+    sa.column("role", sa.Enum("owner_admin", "staff", name="staff_role")),
 )
 
 SEED_ROWS = [
