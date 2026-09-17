@@ -34,6 +34,12 @@ not-yet-resolved session it calls ``resolve_speaker``/``render_identity_greeting
 a match; on an already-resolved session it returns a short placeholder instead
 of re-resolving, mirroring ``booking_agent``'s ``_ALREADY_RESOLVED_PLACEHOLDER``
 pattern.
+
+APPOINTMEN-51 (WhatsApp channel-parity NFR, ``whatsapp-deltas.md`` §2) rewords
+``render_proposed_service_change_restatement``'s closing question (stories
+4.1-4.3) from the open-ended "Shall I confirm this?" to an explicit yes/no
+("Reply YES to confirm or NO to cancel."), mirroring APPOINTMEN-50's fix to
+``app.domain.appointments.render_direct_confirmation``.
 """
 
 import logging
@@ -216,14 +222,17 @@ def render_proposed_service_change_restatement(
     its own "at least one of new_name/new_price" shape); ``ProposedServiceDeletion``
     restates the ``service_id`` being removed, since that is all the type carries —
     resolving it to a service name would require a DB lookup, out of scope here (see
-    the APPOINTMEN-40 plan's Risks). Every branch ends in an explicit ask for
-    confirmation. Pure function, no I/O, no DB access — matches the style of this
-    module's ``render_identity_greeting``/``describe_speaker``.
+    the APPOINTMEN-40 plan's Risks). Every branch ends with an explicit yes/no
+    framing ("Reply YES to confirm or NO to cancel."), per ``whatsapp-deltas.md``
+    §2 (APPOINTMEN-51) — the same fix APPOINTMEN-50 applied to
+    ``render_direct_confirmation``. This is a shared, channel-agnostic renderer
+    with no ``channel`` parameter. Pure function, no I/O, no DB access — matches
+    the style of this module's ``render_identity_greeting``/``describe_speaker``.
     """
     if isinstance(proposed, ProposedService):
         return (
             f"You're adding a new service: {proposed.name!r} at "
-            f"{proposed.price!r}. Shall I confirm this?"
+            f"{proposed.price!r}. Reply YES to confirm or NO to cancel."
         )
     if isinstance(proposed, ProposedServiceEdit):
         changes = []
@@ -234,11 +243,11 @@ def render_proposed_service_change_restatement(
         change_text = " and ".join(changes)
         return (
             f"You're editing service {proposed.service_id!r}: changing "
-            f"{change_text}. Shall I confirm this?"
+            f"{change_text}. Reply YES to confirm or NO to cancel."
         )
     return (
         f"You're removing service {proposed.service_id!r} from the catalog. "
-        "Shall I confirm this?"
+        "Reply YES to confirm or NO to cancel."
     )
 
 
