@@ -49,7 +49,15 @@ Does not own:
 
 ## Allowed skills
 
-`requirements`, `bmad-prd` (read/validate), `bmad-deep-recon` (read research), `bmad-review` (validate artefacts).
+`requirements`, `bmad-prd` (read/validate), `bmad-deep-recon` (read research), `bmad-review` (validate artefacts), `bmad-create-epics-and-stories`.
+
+`bmad-create-epics-and-stories` added 2026-09-17: `sdlc-planning-workflow` Phase 5 names the
+Business Analyst as owner but no agent contract listed the skill as allowed. User decision:
+route to the Business Analyst, since epic/story breakdown is a direct extension of this agent's
+existing "structured requirements artefacts" output (user stories, acceptance criteria — see
+Outputs above), not a new capability. `product-manager.md`'s "Does not own" note pointing story
+breakdown at the Architect was a stale cross-reference, not a competing assignment — no
+architect.md skill list ever included it either.
 
 ## Evidence expectations
 

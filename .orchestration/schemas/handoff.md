@@ -21,6 +21,10 @@ Every evidence path referenced MUST exist.
 ## Work ID
 <WORK-ID>  (matches .orchestration/runs/<WORK-ID>/)
 
+## Last Updated
+<ISO-8601 timestamp, e.g. 2026-09-17T00:00:00+00:00 — stamped by the outgoing
+agent at the moment this file is written>
+
 ## Objective
 One sentence: what this work must achieve.
 
@@ -68,6 +72,9 @@ What would require a human, who decides, and what has already been escalated.
 ## Rules
 
 - Written by the outgoing agent **before** the transition, and at every stop.
+- `Last Updated` MUST be stamped fresh (current time, ISO-8601, matching the
+  format used in `run-record.md`'s `At` column) every time this file is
+  written or overwritten — never left carried over from a prior write.
 - The receiving agent MUST verify sufficiency before acting, and MUST escalate
   rather than guess when a required section is missing or vague.
 - MUST NOT rely on "as discussed", "as usual", or any unnamed prior context.

@@ -16,6 +16,21 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 - Tests are written **after** implementation — this workflow reads existing code and writes tests for it.
 - A **human gate** means: stop, present the artefact, wait for explicit approval before proceeding.
 - **Bounded recovery:** each phase gets one retry on failure before escalating.
+- Any `started` / `updated` / `last_updated` timestamp written to `current.md` or `status.md` is
+  the real current time, captured by running `date -u +%Y-%m-%dT%H:%M:%S+00:00` — never
+  approximate, and never a date-only value.
+
+---
+
+## Communication Style (automatic)
+
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces while reading
+implemented code and writing tests — automatically, for the whole run. No `/caveman` command
+needed; do not wait for the user to ask. It never applies to persisted artefacts (the test plan,
+test files, `{run_record}` rows) and it auto-drops for gate prompts and irreversible-action
+confirmations, per that skill's own Boundaries and Auto-Clarity rules, so it never makes a human
+gate ambiguous.
 
 ---
 
@@ -29,7 +44,9 @@ than creating a new file.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[unit-test] Phase N — Name` (or `[unit-test] Gate N — Name`), `Owner` = `test`, or exactly
   `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` =
-  `commit:<sha>` / `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601.
+  `commit:<sha>` / `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601 — get the real
+  current time by running `date -u +%Y-%m-%dT%H:%M:%S+00:00`; never approximate or pad to
+  midnight.
 - Do not advance `State` past `unit-testing` — `sdlc-qa-workflow` is what moves it to `qa`.
 - Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
   note it and continue.

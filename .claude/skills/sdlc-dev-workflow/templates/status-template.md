@@ -3,8 +3,8 @@ ticket: "{PROJ-NNN}"
 summary: "{ticket summary}"
 branch: "{branch-name}"
 pr_url: "{url or pending}"
-started: "{YYYY-MM-DD}"
-last_updated: "{YYYY-MM-DD HH:MM}"
+started: "{ISO-8601 timestamp, e.g. 2026-09-17T14:32:05+00:00}"
+last_updated: "{ISO-8601 timestamp}"
 overall_status: "{planning | implementing | code-review | unit-testing | qa | complete | stopped}"
 ---
 

@@ -46,9 +46,12 @@ Same launcher pattern as `tools/agent-metrics` and `tools/worktree-add`:
 
 ## When the two folders change
 
-`BACKEND_PREFIX`/`FRONTEND_PREFIX` at the top of `scope-check.py` are the only
-place the folder names are declared. If `CLAUDE.md`'s "Repository layout"
-table ever changes, update them there.
+`scope-check.py` reads the folder names from `.claude/shared/project-config.md`
+→ "Repository Layout" (`Backend folder` / `Frontend folder` rows), falling
+back to `B2B_BE/` / `B2B_FE/` if that file or those rows are absent. If
+`CLAUDE.md`'s "Repository layout" table ever changes, update both: the config
+row (so the check enforces the new names) and the table (so the documented
+rule still matches what's enforced).
 
 ## Smoke test
 

@@ -32,7 +32,7 @@ Does not own:
 - System architecture or technical implementation decisions.
 - UX design or interaction patterns.
 - Accepting its own PRD as validated — validation is a separate pass.
-- Sprint planning or story breakdown — that belongs to the Architect.
+- Sprint planning — that belongs to the Architect. Epic/story breakdown (`bmad-create-epics-and-stories`) belongs to the Business Analyst (corrected 2026-09-17 — see `business-analyst.md` Allowed skills note; this line previously misattributed it to the Architect).
 - Business decisions that require human sign-off (monetization, launch geography, pricing model).
 
 ## Inputs
