@@ -65,10 +65,13 @@ Rules every agent MUST follow:
 This governs every agent that reads or writes application code — Developer,
 Test, Reviewer, and Architect alike.
 
-**Mechanical enforcement.** Rule 2 is checked, not just stated: run
-`tools/scope-check/` against a change before calling it finished (or wire it
-into CI/a pre-commit hook) — it fails if a single diff touches both `B2B_BE/`
-and `B2B_FE/`. See `tools/scope-check/README.md`.
+**Mechanical enforcement.** Rule 2 is checked, not just stated, at three
+points: run `tools/scope-check/` against a change before calling it finished;
+the local pre-commit hook (`.githooks/pre-commit`, opt in once per clone with
+`git config core.hooksPath .githooks`); and the CI check on every pull request
+(`.github/workflows/scope-check.yml`), which is the backstop that holds
+regardless of whether the other two were used. All three fail if a single
+diff touches both `B2B_BE/` and `B2B_FE/`. See `tools/scope-check/README.md`.
 
 ## How Claude Code works in this repository
 

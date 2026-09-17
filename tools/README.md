@@ -8,7 +8,7 @@ Shared deterministic tools for developing and maintaining **salon-app**.
 |---|---|---|
 | `agent-metrics/` | Measures per-agent-run cost, tokens and process facts (rework, human interventions, outcome) | Run manually by developers; `runrecord` is read by the `sdlc-*-workflow` skills' Run Record steps |
 | `worktree-add/` | Creates an isolated git worktree with standard symlinks | The `worktree-add` skill |
-| `scope-check/` | Fails if a change touches both `B2B_BE/` and `B2B_FE/` | Enforces CLAUDE.md's Repository layout rule; run manually or from CI/a pre-commit hook |
+| `scope-check/` | Fails if a change touches both `B2B_BE/` and `B2B_FE/` | Enforces CLAUDE.md's Repository layout rule; run manually, from the local pre-commit hook (`.githooks/pre-commit`), and in CI (`.github/workflows/scope-check.yml`) |
 | `_lib/` | Shared helpers (git/path utilities, config-table parsing) used by `worktree-add` and `scope-check` | Both of the above |
 
 None of these arrived through the "two or more skills need it" rule below in

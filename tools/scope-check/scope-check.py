@@ -27,11 +27,14 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_lib"))
 from common import banner, die  # noqa: E402
+from config_parse import read_config_value  # noqa: E402
 
 # The two authoritative top-level folders from CLAUDE.md's "Repository layout".
-# Update here if that table ever changes.
-BACKEND_PREFIX = "B2B_BE/"
-FRONTEND_PREFIX = "B2B_FE/"
+# Read from .claude/shared/project-config.md -> "Repository Layout" when that
+# file/row exists; these are the fallback defaults otherwise. Update the
+# config row (and CLAUDE.md's table) if the folder names ever change.
+BACKEND_PREFIX = read_config_value("Backend folder") or "B2B_BE/"
+FRONTEND_PREFIX = read_config_value("Frontend folder") or "B2B_FE/"
 
 USAGE = """scope-check — fail if a change touches both B2B_BE/ and B2B_FE/
 

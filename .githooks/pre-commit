@@ -1,0 +1,10 @@
+#!/bin/sh
+# @author Samson Paul, samson.paul@experionglobal.com
+# Blocks a commit whose staged changes touch both B2B_BE/ and B2B_FE/
+# (CLAUDE.md's Repository layout rule). Local, fast feedback before you even
+# push; the CI job (.github/workflows/scope-check.yml) is the backstop that
+# holds regardless of whether this hook is installed.
+#
+# Not active by default — git does not read hooks from a versioned directory.
+# Enable once per clone: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/tools/scope-check/scope-check" --staged
