@@ -31,9 +31,8 @@ one new piece of dispatch logic the WhatsApp webhook adapter
 (``app.api.webhooks.whatsapp``) calls ahead of the customer flow: on a
 not-yet-resolved session it calls ``resolve_speaker``/``render_identity_greeting``
 (both unchanged, reused verbatim) and marks the session Staff/Owner-resolved on
-a match; on an already-resolved session it returns a short placeholder instead
-of re-resolving, mirroring ``booking_agent``'s ``_ALREADY_RESOLVED_PLACEHOLDER``
-pattern.
+a match; on an already-resolved session it now (APPOINTMEN-55 Task 7) calls
+``run_manager_turn`` instead of returning a static placeholder.
 
 APPOINTMEN-55 (FR-25/FR-27, Manager Agent conversational loop) adds
 ``render_proposed_availability_change_restatement`` — the restate half of the
@@ -58,6 +57,16 @@ imported locally inside these two functions rather than at module level:
 ``app.agent.tool_registry`` and ``app.agent.prompts.manager_agent_prompt`` both
 import ``SpeakerContext`` from this module, so a module-level import back into
 either would be a circular import.
+
+APPOINTMEN-55 Task 7 wires that loop into the existing entry point: on an
+already-``manager_resolved`` session, ``resolve_and_greet_speaker`` now calls
+``run_manager_turn`` with the resolved ``SpeakerContext`` and the turn's
+``message``, in place of the static ``_ALREADY_GREETED_PLACEHOLDER`` reply
+APPOINTMEN-49 originally returned there — this is the exact "unwired loop" gap
+APPOINTMEN-41/49/50 each independently flagged. ``resolve_and_greet_speaker``'s
+signature gains ``db: AsyncSession | None`` and ``message: str``, both threaded
+through from the WhatsApp webhook adapter (``app.api.webhooks.whatsapp``),
+which already has both available at its only call site.
 """
 
 import json
@@ -102,9 +111,6 @@ _ROLE_GREETINGS: dict[StaffRole, str] = {
     StaffRole.STAFF: "Hi {name}! Want to update your availability?",
 }
 
-_ALREADY_GREETED_PLACEHOLDER = "Got it — what would you like to do?"
-
-
 class SpeakerContext(BaseModel):
     """The unambiguous "who is speaking" result for a resolved phone number."""
 
@@ -147,7 +153,9 @@ def render_identity_greeting(context: SpeakerContext) -> str:
     return template.format(name=context.name)
 
 
-async def resolve_and_greet_speaker(session_id: str, phone_number: str) -> str | None:
+async def resolve_and_greet_speaker(
+    session_id: str, phone_number: str, db: AsyncSession | None, message: str
+) -> str | None:
     """Run one WhatsApp Staff/Owner identity-resolution turn for ``session_id`` (FR-14/FR-24).
 
     This is the WhatsApp-channel counterpart to
@@ -155,21 +163,35 @@ async def resolve_and_greet_speaker(session_id: str, phone_number: str) -> str |
     called by the WhatsApp webhook adapter ahead of the customer flow:
 
     - Once the session is ``manager_resolved``, ``resolve_speaker`` is never
-      called again — this returns ``_ALREADY_GREETED_PLACEHOLDER`` instead,
-      which is what keeps every turn after the first from re-resolving
-      identity or ever falling through to the customer flow.
+      called again — this now calls ``run_manager_turn`` (Task 6) with the
+      resolved ``SpeakerContext`` and the turn's ``message`` instead of the
+      old static ``_ALREADY_GREETED_PLACEHOLDER`` reply, which is what closes
+      the "unwired loop" gap APPOINTMEN-41/49/50 each independently flagged.
+      Every turn after the first still never re-resolves identity or falls
+      through to the customer flow — it now actually holds a conversation
+      instead of echoing a fixed string.
     - Otherwise, ``resolve_speaker(phone_number)`` (unchanged) is called. No
       match returns ``None`` — the caller is expected to fall through to the
       customer flow. A match sets ``staff_id``/``staff_name``/``staff_role``/
       ``phone_number``/``manager_resolved`` on the session state, saves it,
       and returns ``render_identity_greeting(context)`` (unchanged, reused
       verbatim) — the AC's "first message is directly the role-based
-      greeting."
+      greeting." ``run_manager_turn`` is not called on this first turn: the
+      identity-resolution message itself (the phone number) is not a request
+      for the loop to act on.
+
+    ``db``/``message`` are threaded through from the WhatsApp webhook adapter
+    (``app.api.webhooks.whatsapp``, Task 7) — both already available at its
+    only call site — purely so the already-resolved branch below can hand
+    them to ``run_manager_turn``.
     """
     state = session_store.get_or_create(session_id)
 
     if state.manager_resolved:
-        return _ALREADY_GREETED_PLACEHOLDER
+        speaker = SpeakerContext(id=state.staff_id, name=state.staff_name, role=state.staff_role)
+        return await run_manager_turn(
+            db=db, session_id=session_id, speaker=speaker, message=message
+        )
 
     context = await resolve_speaker(phone_number)
     if context is None:

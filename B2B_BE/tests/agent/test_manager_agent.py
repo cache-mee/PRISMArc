@@ -14,6 +14,7 @@ from app.agent.manager_agent import (
     dispatch_tool,
     present_conflict_check_for_verification,
     render_proposed_availability_change_restatement,
+    resolve_and_greet_speaker,
     run_manager_turn,
 )
 from app.agent.providers.base import LLMResponse, ToolCall
@@ -337,3 +338,75 @@ async def test_run_manager_turn_persists_history_across_two_calls_same_session()
         {"role": "user", "content": "What about Friday?"},
         _assistant_message("Second reply"),
     ]
+
+
+# --- resolve_and_greet_speaker: wiring into run_manager_turn (Task 7) -------
+
+
+@pytest.mark.asyncio
+async def test_resolve_and_greet_speaker_already_resolved_calls_run_manager_turn() -> None:
+    session_id = _unique_session_id()
+    state = session_store.get_or_create(session_id)
+    state.manager_resolved = True
+    state.staff_id = 1
+    state.staff_name = "Dr. Rao"
+    state.staff_role = StaffRole.STAFF
+    session_store.save(session_id, state)
+
+    mock_run_manager_turn = AsyncMock(return_value="Sure, blocking Friday morning.")
+    db_sentinel = object()
+
+    with patch("app.agent.manager_agent.run_manager_turn", mock_run_manager_turn):
+        result = await resolve_and_greet_speaker(
+            session_id, "+911234567890", db_sentinel, "I'm unavailable Friday morning"
+        )
+
+    mock_run_manager_turn.assert_called_once_with(
+        db=db_sentinel,
+        session_id=session_id,
+        speaker=SpeakerContext(id=1, name="Dr. Rao", role=StaffRole.STAFF),
+        message="I'm unavailable Friday morning",
+    )
+    assert result == "Sure, blocking Friday morning."
+
+
+@pytest.mark.asyncio
+async def test_resolve_and_greet_speaker_not_yet_resolved_still_greets_without_looping() -> None:
+    session_id = _unique_session_id()
+    context = SpeakerContext(id=2, name="Ramesh", role=StaffRole.OWNER_ADMIN)
+    mock_resolve_speaker = AsyncMock(return_value=context)
+    mock_run_manager_turn = AsyncMock()
+
+    with (
+        patch("app.agent.manager_agent.resolve_speaker", mock_resolve_speaker),
+        patch("app.agent.manager_agent.run_manager_turn", mock_run_manager_turn),
+    ):
+        result = await resolve_and_greet_speaker(
+            session_id, "+911234500000", None, "+911234500000"
+        )
+
+    mock_resolve_speaker.assert_called_once_with("+911234500000")
+    mock_run_manager_turn.assert_not_called()
+    assert result == "Hi Ramesh! Want to update the service catalog?"
+
+    state = session_store.get_or_create(session_id)
+    assert state.manager_resolved is True
+    assert state.staff_id == 2
+
+
+@pytest.mark.asyncio
+async def test_resolve_and_greet_speaker_no_match_falls_through_without_looping() -> None:
+    session_id = _unique_session_id()
+    mock_resolve_speaker = AsyncMock(return_value=None)
+    mock_run_manager_turn = AsyncMock()
+
+    with (
+        patch("app.agent.manager_agent.resolve_speaker", mock_resolve_speaker),
+        patch("app.agent.manager_agent.run_manager_turn", mock_run_manager_turn),
+    ):
+        result = await resolve_and_greet_speaker(
+            session_id, "+919999999999", None, "+919999999999"
+        )
+
+    assert result is None
+    mock_run_manager_turn.assert_not_called()
