@@ -1,6 +1,6 @@
 ---
 project: salon-app
-started: 2026-09-17
+started: 2026-09-17T00:00:00+00:00
 status: in-progress
 last_completed_phase: 1
 ---
