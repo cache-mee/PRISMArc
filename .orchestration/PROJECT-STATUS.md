@@ -36,6 +36,7 @@
 | APPOINTMEN-25 | 2.8 SM-4b: Alternative-slot human-verification checkpoint | feature/APPOINTMEN-25-alternative-slot-human-verification | sdlc-dev-workflow | Phase 6 — Code Review | new session: /sdlc-dev-workflow review APPOINTMEN-25 | `.orchestration/runs/APPOINTMEN-25/status.md` |
 | APPOINTMEN-28 | 2.11 FR-11: Cancel a booking | feature/APPOINTMEN-28-211-fr-11-cancel-a-booking | sdlc-dev-workflow | Phase 6 — Code Review | new session: /sdlc-dev-workflow review APPOINTMEN-28 | `.orchestration/runs/APPOINTMEN-28/status.md` |
 | APPOINTMEN-42 | 4.6 FR-22: Owner/Admin cannot manage staff accounts | feature/APPOINTMEN-42-owner-admin-cannot-manage-staff-accounts | sdlc-dev-workflow | Phase 6 — Code Review (stopped) | user merging PR #48 manually | `.orchestration/runs/APPOINTMEN-42/status.md` |
+| APPOINTMEN-55 | Manager Agent conversational loop: staff satisfies SM-4a/b/c via natural language | feature/APPOINTMEN-55-manager-agent-conversational-loop | sdlc-dev-workflow | Phase 6 handoff — PR [#64](https://github.com/cache-mee/PRISMArc/pull/64) raised | new session: /sdlc-dev-workflow review APPOINTMEN-55 | `.orchestration/runs/APPOINTMEN-55/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
