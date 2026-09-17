@@ -23,6 +23,17 @@ APPOINTMEN-41 (FR-21, Owner/Admin cannot manage own availability) adds
 ``app.domain.owner_admin_availability_boundary.decline_owner_admin_own_availability_request``
 for an already-resolved speaker, ahead of ``build_proposed_availability_change`` /
 ``confirm_and_apply_availability_change`` ever running for that speaker.
+
+APPOINTMEN-49 (FR-14/FR-24, WhatsApp Staff/Owner identity resolution) adds
+``resolve_and_greet_speaker`` — the WhatsApp-channel counterpart to
+``app.agent.booking_agent.handle_message``'s customer-identity gate. It is the
+one new piece of dispatch logic the WhatsApp webhook adapter
+(``app.api.webhooks.whatsapp``) calls ahead of the customer flow: on a
+not-yet-resolved session it calls ``resolve_speaker``/``render_identity_greeting``
+(both unchanged, reused verbatim) and marks the session Staff/Owner-resolved on
+a match; on an already-resolved session it returns a short placeholder instead
+of re-resolving, mirroring ``booking_agent``'s ``_ALREADY_RESOLVED_PLACEHOLDER``
+pattern.
 """
 
 import logging
@@ -32,6 +43,7 @@ from pydantic import BaseModel
 
 from app.agent.availability_intent import parse_availability_change
 from app.agent.catalog_intent import is_catalog_change_request
+from app.agent.state import session_store
 from app.domain.availability import ProposedAvailabilityChange
 from app.domain.conflict_verification import VerifiedConflictCheck
 from app.domain.conflicts import ConflictCheckResult
@@ -63,6 +75,8 @@ _ROLE_GREETINGS: dict[StaffRole, str] = {
     StaffRole.OWNER_ADMIN: "Hi {name}! Want to update the service catalog?",
     StaffRole.STAFF: "Hi {name}! Want to update your availability?",
 }
+
+_ALREADY_GREETED_PLACEHOLDER = "Got it — what would you like to do?"
 
 
 class SpeakerContext(BaseModel):
@@ -105,6 +119,43 @@ def render_identity_greeting(context: SpeakerContext) -> str:
     """
     template = _ROLE_GREETINGS[context.role]
     return template.format(name=context.name)
+
+
+async def resolve_and_greet_speaker(session_id: str, phone_number: str) -> str | None:
+    """Run one WhatsApp Staff/Owner identity-resolution turn for ``session_id`` (FR-14/FR-24).
+
+    This is the WhatsApp-channel counterpart to
+    ``app.agent.booking_agent.handle_message``'s customer-identity gate,
+    called by the WhatsApp webhook adapter ahead of the customer flow:
+
+    - Once the session is ``manager_resolved``, ``resolve_speaker`` is never
+      called again — this returns ``_ALREADY_GREETED_PLACEHOLDER`` instead,
+      which is what keeps every turn after the first from re-resolving
+      identity or ever falling through to the customer flow.
+    - Otherwise, ``resolve_speaker(phone_number)`` (unchanged) is called. No
+      match returns ``None`` — the caller is expected to fall through to the
+      customer flow. A match sets ``staff_id``/``staff_name``/``staff_role``/
+      ``phone_number``/``manager_resolved`` on the session state, saves it,
+      and returns ``render_identity_greeting(context)`` (unchanged, reused
+      verbatim) — the AC's "first message is directly the role-based
+      greeting."
+    """
+    state = session_store.get_or_create(session_id)
+
+    if state.manager_resolved:
+        return _ALREADY_GREETED_PLACEHOLDER
+
+    context = await resolve_speaker(phone_number)
+    if context is None:
+        return None
+
+    state.phone_number = phone_number
+    state.staff_id = context.id
+    state.staff_name = context.name
+    state.staff_role = context.role
+    state.manager_resolved = True
+    session_store.save(session_id, state)
+    return render_identity_greeting(context)
 
 
 def build_proposed_availability_change(
