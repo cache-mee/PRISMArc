@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
 
 
-def create_booking(
-    db: Session,
+async def create_booking(
+    db: AsyncSession,
     *,
     customer_id: int,
     staff_id: int,
@@ -26,6 +26,6 @@ def create_booking(
         status=status,
     )
     db.add(booking)
-    db.commit()
-    db.refresh(booking)
+    await db.commit()
+    await db.refresh(booking)
     return booking

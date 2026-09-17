@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.availability import Availability
 
 
-def create_availability(
-    db: Session,
+async def create_availability(
+    db: AsyncSession,
     *,
     staff_id: int,
     start_time: datetime,
@@ -24,6 +24,6 @@ def create_availability(
         blocked=blocked,
     )
     db.add(availability)
-    db.commit()
-    db.refresh(availability)
+    await db.commit()
+    await db.refresh(availability)
     return availability

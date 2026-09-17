@@ -17,14 +17,14 @@ class SpeakerContext(BaseModel):
     role: StaffRole
 
 
-def resolve_speaker(phone_number: str) -> SpeakerContext | None:
+async def resolve_speaker(phone_number: str) -> SpeakerContext | None:
     """Resolve which Staff member is speaking, from their phone number.
 
     This is the hook point a future conversational Manager Agent loop calls
     once a phone number has been collected from the user. Returns None when
     the phone number does not match any pre-seeded Staff record.
     """
-    identity = resolve_staff_identity(phone_number)
+    identity = await resolve_staff_identity(phone_number)
     if identity is None:
         return None
     return SpeakerContext(id=identity.id, name=identity.name, role=identity.role)

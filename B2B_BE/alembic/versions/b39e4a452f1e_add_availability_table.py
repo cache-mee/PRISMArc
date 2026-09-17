@@ -1,7 +1,7 @@
 """add availability table
 
 Revision ID: b39e4a452f1e
-Revises: c8354b5d4b5c
+Revises: 46fe8dea4e24
 Create Date: 2026-09-17 20:35:05.949418
 
 """
@@ -14,7 +14,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b39e4a452f1e"
-down_revision: str | Sequence[str] | None = "c8354b5d4b5c"
+down_revision: str | Sequence[str] | None = "46fe8dea4e24"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

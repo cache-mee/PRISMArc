@@ -4,7 +4,7 @@ from sqlalchemy import Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from app.db import Base
+from app.models.base import Base
 
 
 class Service(Base):

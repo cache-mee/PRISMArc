@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.appointments import StaffNotFoundError
 from app.models.availability import Availability
@@ -32,8 +32,8 @@ class ProposedAvailabilityChange(BaseModel):
     confirmed: bool = False
 
 
-def confirm_and_apply_availability_change(
-    db: Session, change: ProposedAvailabilityChange
+async def confirm_and_apply_availability_change(
+    db: AsyncSession, change: ProposedAvailabilityChange
 ) -> Availability:
     """Create an Availability row from a confirmed proposed change (FR-27).
 
@@ -53,13 +53,13 @@ def confirm_and_apply_availability_change(
             "Cannot apply an unconfirmed ProposedAvailabilityChange."
         )
 
-    staff = get_staff_by_name(db, change.staff_name)
+    staff = await get_staff_by_name(db, change.staff_name)
     if staff is None:
         raise StaffNotFoundError(
             f"No Staff record found for staff_name={change.staff_name!r}."
         )
 
-    return create_availability(
+    return await create_availability(
         db,
         staff_id=staff.id,
         start_time=change.start_time,
