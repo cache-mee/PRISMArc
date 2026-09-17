@@ -30,7 +30,7 @@
 
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — |
+| APPOINTMEN-42 | 4.6 FR-22: Owner/Admin cannot manage staff accounts | feature/APPOINTMEN-42-owner-admin-cannot-manage-staff-accounts | sdlc-dev-workflow | Phase 6 — Code Review (stopped) | user merging PR #48 manually | `.orchestration/runs/APPOINTMEN-42/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
