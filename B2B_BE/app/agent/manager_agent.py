@@ -17,6 +17,12 @@ APPOINTMEN-40 (FR-18, Confirmation required before catalog changes apply) adds
 SM-4a-equivalent checkpoint hook point for a pending ``ProposedService`` /
 ``ProposedServiceEdit`` / ``ProposedServiceDeletion`` (``app.domain.services``),
 ahead of that module's existing ``confirm_and_*_service`` write gates.
+
+APPOINTMEN-41 (FR-21, Owner/Admin cannot manage own availability) adds
+``respond_to_owner_admin_availability_request`` — the hook point that consults
+``app.domain.owner_admin_availability_boundary.decline_owner_admin_own_availability_request``
+for an already-resolved speaker, ahead of ``build_proposed_availability_change`` /
+``confirm_and_apply_availability_change`` ever running for that speaker.
 """
 
 import logging
@@ -30,6 +36,9 @@ from app.domain.availability import ProposedAvailabilityChange
 from app.domain.conflict_verification import VerifiedConflictCheck
 from app.domain.conflicts import ConflictCheckResult
 from app.domain.dashboard_access import decline_staff_dashboard_request
+from app.domain.owner_admin_availability_boundary import (
+    decline_owner_admin_own_availability_request,
+)
 from app.domain.schedule_override import decline_staff_schedule_override
 from app.domain.services import (
     ProposedService,
@@ -252,3 +261,16 @@ def respond_to_schedule_override_request(
     return decline_staff_schedule_override(
         speaker.name, speaker.role, change.staff_name
     )
+
+
+def respond_to_owner_admin_availability_request(speaker: SpeakerContext) -> str | None:
+    """Consult the FR-21 guard for an already-resolved Manager Agent speaker.
+
+    Hook point a future conversational Manager Agent loop calls immediately after an incoming
+    message has been classified as a block/unblock-availability request (that classification
+    step does not exist yet — see the FR-21 implementation plan's Out of Scope), before
+    ``build_proposed_availability_change`` or ``confirm_and_apply_availability_change`` ever run
+    for that speaker. Returns the decline string to send back verbatim when not ``None``;
+    returns ``None`` when the request should proceed (Staff).
+    """
+    return decline_owner_admin_own_availability_request(speaker.role)
