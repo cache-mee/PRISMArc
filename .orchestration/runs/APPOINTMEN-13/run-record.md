@@ -2,9 +2,9 @@
 <!-- Appended by every sdlc-*-workflow phase and gate that touches this work. Do not hand-edit. -->
 
 Issue:  APPOINTMEN-13
-Branch: feature/APPOINTMEN-13-shared-data-store-entities
-State:  in-development
-Next:   scope-check, push, update PR #21, Phase 6 — Code Review
+Branch: feature/APPOINTMEN-13-shared-data-store-entities (deleted from remote post-merge)
+State:  complete
+Next:   none — ticket complete
 
 | # | Step | Owner | Outcome | Evidence | At |
 |---|---|---|---|---|---|
@@ -27,3 +27,10 @@ Next:   scope-check, push, update PR #21, Phase 6 — Code Review
 | 17 | [dev] Retrofit 2 — Salon entity (AC1, minimal) | developer | done | commit:10d8720; upgrade/downgrade/upgrade verified, exactly one row | 2026-09-17T15:44:00+00:00 |
 | 18 | [dev] Retrofit 2 — role-filtered staff queries (AC3) + enum fix | developer | done | commit:2aeef36; Ramesh excluded from both queries, verified against real Postgres | 2026-09-17T15:45:00+00:00 |
 | 19 | [dev] Retrofit 2 — Bookings.service_id FK (AC4) | developer | done | commit:a2b4993; backfill verified with real test data, full chain regression clean | 2026-09-17T15:45:43+00:00 |
+| 20 | [dev] scope-check (final) | lead | done | exit:0:tools/scope-check/scope-check --base develop --head feature/APPOINTMEN-13-shared-data-store-entities (13 files) | 2026-09-17T15:46:00+00:00 |
+| 21 | [dev] Push + PR description update | lead | done | push force-with-lease; pr:https://github.com/cache-mee/PRISMArc/pull/21 (updated) | 2026-09-17T15:47:00+00:00 |
+| 22 | [dev] Gate — Final merge confirmation | human | done | approved | 2026-09-17T15:47:30+00:00 |
+| 23 | [dev] Merge | lead | done | pr:merged; commit:88005d6 | 2026-09-17T15:47:55+00:00 |
+| 24 | [dev] Gate — Jira status after merge | human | done | "Move to Ready for UAT (done-category)" | 2026-09-17T15:55:00+00:00 |
+| 25 | [dev] Jira transitions to Ready for UAT | lead | done | jira:transitioned (In Review → In QA → QA Done → Ready for UAT) | 2026-09-17T15:55:30+00:00 |
+| 26 | [dev] Cleanup — delete 19 stale/merged remote branches | lead | done | approved; incl. feature/APPOINTMEN-13-shared-data-store-entities itself | 2026-09-17T15:53:00+00:00 |

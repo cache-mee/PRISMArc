@@ -1,14 +1,14 @@
 # APPOINTMEN-13 — status
 
 Summary: 1.1 Shared data store entities exist
-Branch:  feature/APPOINTMEN-13-shared-data-store-entities (rebuilt twice on develop's tip after moving-target conflicts — see Issues & Blockers)
-PR:      https://github.com/cache-mee/PRISMArc/pull/21 (needs force-push update)
+Branch:  feature/APPOINTMEN-13-shared-data-store-entities (deleted from remote post-merge; rebuilt twice on develop's tip after moving-target conflicts — see Issues & Blockers)
+PR:      https://github.com/cache-mee/PRISMArc/pull/21 — MERGED into develop (88005d6)
 
 ## You Are Here
 Workflow: sdlc-dev-workflow
-Phase:    Phase 4 — Code Implementation (trimmed retrofit complete)
+Phase:    Complete
 Waiting:  n/a
-Next:     scope-check, push, update PR #21, proceed to merge
+Next:     none — ticket complete
 
 ## Phase Tracker
 
@@ -18,8 +18,8 @@ Next:     scope-check, push, update PR #21, proceed to merge
 [✓] Phase 3 — Implementation Plan
 [✓] Gate 3 — Plan Review
 [✓] Phase 4 — Code Implementation (trimmed retrofit — see Issues & Blockers)
-[→] Phase 5 — Pull Request (PR #21 exists, needs updating with final branch)
-[ ] Phase 6 — Code Review
+[✓] Phase 5 — Pull Request (PR #21 merged)
+[-] Phase 6 — Code Review (skipped, explicit user override)
 
 ## Artefacts
 Implementation plan   development/plans/APPOINTMEN-13-implementation-plan.md   [describes original from-scratch design; actual delivered scope is the trimmed retrofit below]
@@ -32,7 +32,10 @@ a2b4993   APPOINTMEN-13: Link Bookings to Service via service_id FK (AC4)
 
 ## Jira Transitions
 Start Dev        →   In Development   [done]
-Ready for Review →   In Review        [done, from the original PR — still accurate]
+Ready for Review →   In Review        [done]
+Ready for QA     →   In QA            [done]
+QA Done          →   QA Done          [done]
+QA Done          →   Ready for UAT    [done, explicit user override — no QA actually ran]
 
 ## Issues & Blockers (resolved, kept for audit trail)
 - develop advanced significantly while this ticket was in flight; other tickets (14/15/17/18/19/22/26/33)
@@ -52,5 +55,5 @@ Ready for Review →   In Review        [done, from the original PR — still ac
   and a values_callable gap in the Staff model itself that silently broke any future role-based query.
 
 ## How to Resume
-Run `/sdlc-dev-workflow APPOINTMEN-13`. Branch is rebuilt on develop's tip with 4 new commits (trimmed
-scope). Still needs: scope-check, force-push to update PR #21, then merge.
+Ticket complete — nothing to resume. PR #21 merged into develop (88005d6); feature branch deleted from
+remote post-merge; Jira at Ready for UAT.

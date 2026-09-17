@@ -1,5 +1,5 @@
 workflow: sdlc-dev-workflow
-phase: Phase 4 — Code Implementation (trimmed retrofit complete)
-status: running
+phase: Complete (Phase 6 code review, unit-test, and QA workflows all skipped — explicit user override)
+status: complete
 waiting: n/a
-next: Run scope-check, push rebuilt branch, update PR #21, proceed to merge
+next: none — ticket complete, PR #21 merged into develop, Jira at Ready for UAT
