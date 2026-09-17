@@ -13,6 +13,10 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
+- `{plans_dir}` resolves to `{project-root}/development/plans/`.
+- `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md` — written by
+  `sdlc-dev-workflow` Phase 3. This is the ticket's single source of truth (summary, acceptance
+  criteria, tasks, affected files); there is no separate `ticket.md` anywhere.
 - Tests are written **after** implementation — this workflow reads existing code and writes tests for it.
 - A **human gate** means: stop, present the artefact, wait for explicit approval before proceeding.
 - **Bounded recovery:** each phase gets one retry on failure before escalating.
@@ -53,6 +57,21 @@ than creating a new file.
 
 ---
 
+## Status Artefacts (workflow-status)
+
+Schema: `.orchestration/schemas/ticket-status.md`.
+
+- After **every** phase and gate reply, update `current.md`'s five fields and `status.md`'s "You
+  Are Here" section and the matching Phase Tracker row for `sdlc-unit-test-workflow`.
+- Update this ticket's row in `.orchestration/PROJECT-STATUS.md`'s Active Tickets table (Current
+  Workflow = `sdlc-unit-test-workflow`, Phase = the phase just reached, Waiting On = the gate
+  question if one is pending, else "—"). If no row exists yet for `{ticket}` (this workflow was
+  invoked standalone, skipping `sdlc-dev-workflow`), create one.
+- Never let this slow down or gate the workflow itself. If these files cannot be written, note
+  it and continue.
+
+---
+
 ## On Activation
 
 1. Ask for `{ticket}` if not supplied.
@@ -70,7 +89,7 @@ than creating a new file.
    On `detail`: read `{run_dir}/status.md` and present in full, then ask resume/restart.
    Wait for the user's reply.
 4. Update `{run_dir}/current.md` — set workflow to `sdlc-unit-test-workflow`, phase to `Phase 1 — Code Reconnaissance`, status to `running`.
-5. Read `{run_dir}/implementation-plan.md` and `{run_dir}/ticket.md` to understand what was built.
+5. Read `{plan_file}` (`{plans_dir}/{ticket}-implementation-plan.md`) to understand what was built — it is the only ticket-context artefact `sdlc-dev-workflow` produces; there is no separate `ticket.md`.
 6. Confirm the branch is checked out: `git branch --show-current`. If not on `{branch_name}`, run `git checkout {branch_name}`.
 7. Begin at **Phase 1** (or the resume phase).
 
@@ -109,13 +128,13 @@ than creating a new file.
 
 **Owner:** Test agent (`.claude/agents/test.md`)
 **Skill:** `test-design`
-**Input:** `{run_dir}/implementation-plan.md` + all files listed in the plan's "Files to Modify / Create" sections
+**Input:** `{plan_file}` + all files listed in the plan's "Files to Modify / Create" sections
 
 ### Instructions
 
 1. Invoke the Test agent. Pass it:
-   - `{run_dir}/implementation-plan.md` — to understand what was implemented
-   - `{run_dir}/ticket.md` — for business context
+   - `{plan_file}` — to understand what was implemented and for business/ticket context (its
+     own Ticket Reference section covers what a separate `ticket.md` would have)
    - `stack/rules/base-rules.md` — for testing framework, coverage requirements, and conventions
 2. The Test agent reads every file named in the implementation plan. For each:
    - Identifies all public functions, methods, classes, or modules.
@@ -279,7 +298,9 @@ Next step:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-Update `{run_dir}/status.md` — set `unit_tests: complete`.
+Update `{run_dir}/status.md` — set `unit_tests: complete`, mark all `sdlc-unit-test-workflow`
+Phase Tracker rows `✓`, and update this ticket's `PROJECT-STATUS.md` Active Tickets row: Current
+Workflow = `sdlc-qa-workflow` (next), Phase = `not started`, Waiting On = `—`.
 
 ---
 

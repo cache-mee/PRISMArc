@@ -57,6 +57,33 @@ Schema: `.orchestration/schemas/run-record.md`.
 
 ---
 
+## Status Artefacts (workflow-status)
+
+Schema: `.orchestration/schemas/ticket-status.md`. These are separate from `{run_record}` —
+`run-record.md` is an append-only metrics ledger; `current.md`/`status.md` are the
+rewritten-in-place snapshot `workflow-status` reads, and `.orchestration/PROJECT-STATUS.md` is
+the project-wide index of active/completed/blocked tickets.
+
+- On first use (Phase 1), create `{run_dir}/current.md` and `{run_dir}/status.md` per the
+  schema, and add a row for `{ticket}` to the **Active Tickets** table in
+  `.orchestration/PROJECT-STATUS.md` (create the file from scratch using the structure already
+  documented in `.claude/skills/workflow-status/SKILL.md`'s Project Overview template if it does
+  not yet exist — do not invent a different shape).
+- After **every** phase and gate reply, update (never append) `current.md`'s five fields and
+  `status.md`'s "You Are Here" section and the matching Phase Tracker row for
+  `sdlc-dev-workflow`, and update this ticket's row in `PROJECT-STATUS.md`'s Active Tickets table
+  (Current Workflow = `sdlc-dev-workflow`, Phase = the phase just reached, Waiting On = the gate
+  question if one is pending, else "—").
+- Phase 2 sets `status.md`'s `Branch:` field once the branch exists.
+- Phase 5 sets `status.md`'s `PR:` field once the PR is created.
+- On the Phase 6 handoff (see below), set `current.md`'s `waiting` to
+  "new session: /sdlc-dev-workflow review {ticket}" and leave the ticket's `PROJECT-STATUS.md`
+  row in Active Tickets — the ticket is not done; it is handed off, not completed.
+- Never let this slow down or gate the workflow itself. If these files cannot be written, note
+  it and continue — they are resumability aids, not correctness-critical state.
+
+---
+
 ## On Activation
 
 1. Ask the user: "Which Jira ticket are you starting work on?" if a ticket key was not supplied with the invocation.
@@ -212,7 +239,9 @@ Derive the branch name from the ticket key and summary:
    - Includes testing requirements derived from `stack/rules/base-rules.md`.
    - Explicitly lists what is out of scope for this ticket.
 4. Save the completed plan to `{plans_dir}/{ticket}-implementation-plan.md`.
-5. No other files are created by this phase — no ticket.md, no status.md, no current.md.
+5. No separate `ticket.md` is created by this phase — the plan file's own Ticket Reference
+   section is the single source of truth for ticket context. (`current.md`/`status.md` are
+   maintained per the **Status Artefacts** section above, not by this phase specifically.)
 
 ### Gate 3 — Plan Review
 
@@ -422,27 +451,41 @@ To fix and re-review:
 
 ### On PASS
 
+**Do not target Jira's "Done" (or any status in Jira's `done` status category) at this point.**
+QA has not run yet — `sdlc-unit-test-workflow` and `sdlc-qa-workflow` still stand between this
+review passing and the ticket being genuinely finished. Reaching a `done`-category status is
+`sdlc-qa-workflow` Phase 4's job (see that skill's Jira-transition rule), never this phase's.
+
 1. Call `mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue` with: `"Automated review passed. PR {pr_url} is ready for merge."`.
-2. Present the **Done gate** and wait for the user's reply:
+2. Present the **next-stage gate** and wait for the user's reply:
 
 ```
 ── REVIEW PASSED ─────────────────────────────────────────────────────────────
 Review: development/plans/{ticket}-review.md
 
-The PR is ready to merge.
+The PR is ready to merge, but QA has not run yet.
   PR:     {pr_url}
   Ticket: {ticket}
 
-Move {ticket} to "Done" in Jira now?
+Move {ticket} forward in Jira now (to whatever this project's next in-progress
+status is after review — e.g. "Ready for QA" — never to Done/Ready for UAT/any
+done-category status)?
 
 Reply with one of:
-  yes   → transition ticket to Done in Jira
-  no    → skip (you can transition manually in Jira after merging)
+  yes   → transition ticket to the next in-progress status in Jira
+  no    → skip (leave the ticket's Jira status as-is)
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-   - On `yes`: call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` for `{ticket}` to find the transition to "Done", then call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue`. If the transition fails (e.g. project requires PR to be merged first), log the failure and advise the user to transition manually.
+   - On `yes`: call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` for `{ticket}`.
+     Select the available transition whose target status has the **highest indeterminate**
+     progress that is still short of the `done` category (`statusCategory.key` of `new` or
+     `indeterminate`, never `done`) — e.g. "Ready for QA" / "In QA". If no such transition is
+     available, do not force one; report the available options to the user and let them choose,
+     or skip.
    - On `no`: continue.
+   - Next steps for the user: run `sdlc-unit-test-workflow` (unit tests) then `sdlc-qa-workflow`
+     (integration tests + the actual done-category Jira transition) for `{ticket}`.
 
 ---
 
@@ -457,9 +500,13 @@ development/
     └── {ticket}-review.md                # Review output (created only during Phase 6)
 ```
 
-**One plan file per ticket. No ticket.md, no status.md, no current.md.**
-The plan file contains the ticket reference, branch, acceptance criteria, and all tasks.
-It is the only artefact persisted to disk between phases.
+**One plan file per ticket. No separate `ticket.md`.**
+The plan file contains the ticket reference, branch, acceptance criteria, and all tasks — it is
+the single source of truth for ticket context, and other workflows (`sdlc-unit-test-workflow`,
+`sdlc-qa-workflow`) MUST read it from this exact path, not from a `{run_dir}`-relative guess.
+`current.md`/`status.md` under `.orchestration/runs/{ticket}/` are also maintained (see
+**Status Artefacts** above) — they are resumability aids read by `workflow-status`, not a
+second copy of the plan's content.
 
 ---
 
@@ -488,10 +535,10 @@ The Developer agent MUST NOT invoke `bmad-quick-dev` (deprecated), `bmad-dev-sto
   overriding the check.
 - A human decision is required that no agent can make.
 
-On any stop: tell the user exactly where things stand and what command to run to resume. The plan file at `{plan_file}` preserves all context needed to continue in a future session.
+On any stop: tell the user exactly where things stand and what command to run to resume. The plan file at `{plan_file}` preserves all context needed to continue in a future session; `current.md`/`status.md` (Status Artefacts, above) also reflect the stop for `workflow-status` to surface.
 
 ---
 
 ## Resuming a Stopped Run
 
-On activation, the workflow checks whether `{plan_file}` exists. If it does, it reads the file, presents a resume/restart/view prompt, and continues from the appropriate phase. No separate status file is needed — the plan file is the single resume anchor.
+On activation, the workflow checks whether `{plan_file}` exists. If it does, it reads the file, presents a resume/restart/view prompt, and continues from the appropriate phase. The plan file is the authoritative resume anchor for this workflow's own logic; `current.md`/`status.md` are updated alongside it so `workflow-status` stays accurate but are never the source of truth for what phase to resume into.
