@@ -30,7 +30,7 @@
 
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — |
+| APPOINTMEN-14 | LLM provider integration via litellm (generic AI-provider handler) — Jira key reused ad hoc; actual ticket text unrelated & already Ready for UAT under a different branch | feature/APPOINTMEN-14-llm-provider-integration | sdlc-dev-workflow | Gate 3 — Plan Review | user reply: implement / revise: <notes> / stop | `.orchestration/runs/APPOINTMEN-14/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
@@ -49,6 +49,9 @@
 | APPOINTMEN-22 | 2.5 FR-6: Exact-time resolution — direct confirmation | feature/APPOINTMEN-22-exact-time-direct-confirm | [#19](https://github.com/cache-mee/PRISMArc/pull/19) — MERGED into develop (49cfcae) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override, time constraints); no independent verification performed; Jira moved straight In Review → Ready for UAT (done-category); developed in an isolated git worktree | 2026-09-17 |
 | APPOINTMEN-26 | 2.9 FR-9: Booking confirmation and creation | feature/APPOINTMEN-26-booking-confirmation-creation | [#24](https://github.com/cache-mee/PRISMArc/pull/24) — MERGED into develop (243e495) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override, time constraints); no independent verification performed; Jira moved straight In Review → Ready for UAT (done-category); developed in an isolated git worktree | 2026-09-17 |
 | APPOINTMEN-33 | 3.4 FR-27: Confirmation required before an availability change applies | feature/APPOINTMEN-33-availability-change-confirmation | [#26](https://github.com/cache-mee/PRISMArc/pull/26) — MERGED into develop (b6ceea9) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override, time constraints); no independent verification performed; Jira moved straight In Review → Ready for UAT (done-category); developed in an isolated git worktree; required reconciling a real merge conflict + sync-to-async SQLAlchemy conversion before merge (re-validated after) | 2026-09-17 |
+| APPOINTMEN-21 | 2.4 SM-4a: Booking-intent human-verification checkpoint | feature/APPOINTMEN-21-booking-intent-verification-checkpoint | [#32](https://github.com/cache-mee/PRISMArc/pull/32) — MERGED into develop (624ae1f) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override, time constraints); no independent verification performed beyond manual smoke tests and scope-check; Jira moved In Review → Ready for UAT (done-category) via the mechanical In QA/QA Done hops Jira's workflow requires — no QA actually performed; developed in an isolated git worktree | 2026-09-17 |
+| APPOINTMEN-23 | 2.6 FR-7: Day-only resolution — list that day's available slots | feature/APPOINTMEN-23-day-only-available-slots | [#33](https://github.com/cache-mee/PRISMArc/pull/33) — MERGED into develop (0b9a83b) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override); no independent verification performed beyond manual/mocked validation during implementation and scope-check; Jira moved In Review → Ready for UAT (done-category) via the mechanical In QA/QA Done hops Jira's workflow requires — no QA actually performed; developed in an isolated git worktree; required merging develop mid-cycle and resolving two real merge conflicts (duplicate `list_bookable_staff` in `staff_repository.py`, docstring/import conflicts in `booking_agent.py`) before merge | 2026-09-17 |
+| APPOINTMEN-24 | 2.7 FR-8: Exact-time-unavailable resolution — nearest alternative(s) | feature/APPOINTMEN-24-exact-time-unavailable-alternatives | [#34](https://github.com/cache-mee/PRISMArc/pull/34) — MERGED into develop (a9c82a0) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override); no independent verification performed beyond scope-check and lint; Jira moved In Review → Ready for UAT (done-category) via the mechanical In QA/QA Done hops Jira's workflow requires — no QA actually performed; developed in an isolated git worktree; required merging develop mid-cycle and resolving one real merge conflict (combining this ticket's FR-8 hook with newly-merged FR-7 in `booking_agent.py`) before merge | 2026-09-17 |
 
 ---
 
@@ -77,4 +80,4 @@
 
 ---
 
-*Last updated: 2026-09-17 by sdlc-dev-workflow (APPOINTMEN-11 — completed without unit-test/QA workflows, explicit user override)*
+*Last updated: 2026-09-17 by sdlc-dev-workflow (APPOINTMEN-24 — PR #34 merged, Jira moved to Ready for UAT per explicit user direction; code review/unit-test/QA workflows skipped)*
