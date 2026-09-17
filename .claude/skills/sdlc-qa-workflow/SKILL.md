@@ -16,6 +16,9 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill is owned by QA — not t
 - `{pr_url}` is the GitHub PR URL for this ticket.
 - Integration tests test **boundaries** — two or more real components working together. They do not mock everything; they mock only external services (third-party APIs, email, payments).
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
+- Any `started` / `updated` / `last_updated` timestamp written to `current.md` or `status.md` is
+  the real current time, captured by running `date -u +%Y-%m-%dT%H:%M:%S+00:00` — never
+  approximate, and never a date-only value.
 
 ---
 
