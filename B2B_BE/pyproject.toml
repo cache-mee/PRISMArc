@@ -16,6 +16,8 @@ dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
     "anthropic>=0.40",
+    "twilio>=9.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
