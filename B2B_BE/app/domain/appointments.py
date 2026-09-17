@@ -61,7 +61,7 @@ class BookingOwnershipError(ValueError):
 
 
 class BookingAlreadyCancelledError(ValueError):
-    """Raised when attempting to reschedule a Booking that is already cancelled."""
+    """Raised when a Booking involved in a cancel or reschedule is already cancelled."""
 
 
 class ResolvedBookingCandidate(BaseModel):
@@ -135,6 +135,44 @@ async def confirm_and_create_booking(
         start_time=candidate.start_time,
         commit=commit,
     )
+
+
+async def cancel_customer_booking(
+    db: AsyncSession, *, booking_id: int, customer_id: int
+) -> Booking:
+    """Cancel an existing Booking on behalf of the requesting Customer (FR-11).
+
+    Resolves ``booking_id`` via ``get_booking_by_id`` and raises rather than
+    silently no-op'ing when the request cannot be satisfied:
+
+    - ``BookingNotFoundError`` if ``booking_id`` does not resolve to any row.
+    - ``BookingOwnershipError`` if the resolved booking's ``customer_id`` does
+      not match ``customer_id``.
+    - ``BookingAlreadyCancelledError`` if the resolved booking's ``status``
+      is already ``"cancelled"``.
+
+    Otherwise immediately delegates to ``set_booking_status`` and returns the
+    updated row. Per the ticket's explicit note (unlike FR-9/FR-18/FR-27),
+    there is no confirmation flag or confirmation step here — cancellation
+    executes on request.
+    """
+    booking = await get_booking_by_id(db, booking_id)
+    if booking is None:
+        raise BookingNotFoundError(
+            f"No Booking record found for booking_id={booking_id!r}."
+        )
+
+    if booking.customer_id != customer_id:
+        raise BookingOwnershipError(
+            f"Booking booking_id={booking_id!r} is not owned by customer_id={customer_id!r}."
+        )
+
+    if booking.status == "cancelled":
+        raise BookingAlreadyCancelledError(
+            f"Booking booking_id={booking_id!r} is already cancelled."
+        )
+
+    return await set_booking_status(db, booking, "cancelled")
 
 
 class BookingHistoryItem(BaseModel):

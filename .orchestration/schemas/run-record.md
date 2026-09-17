@@ -52,10 +52,13 @@ Task:   {optional — path to the planning-cycle run-record.md this ticket origi
   `[unit-test]`, `[qa]` — followed by the phase name exactly as that workflow's own pipeline
   names it (e.g. `[dev] Phase 3 — Implementation Plan`). The tag is what lets one file show
   which workflow produced which row; nothing else in the record says so.
-- **Owner** — the acting agent's name (`lead`, `business-analyst`, `product-manager`,
-  `architect`, `ux-designer`, `developer`, `test`, `reviewer`), or exactly `human` for a gate
-  reply. `runrecord.py` only counts a row as a human intervention when `Owner` is exactly
-  `human` — any other spelling silently is not counted.
+- **Owner** — the acting agent's name (`business-analyst`, `product-manager`, `architect`,
+  `ux-designer`, `developer`, `test`, `reviewer`), or exactly `human` for a gate reply. `lead` is
+  also a valid value, but denotes a workflow skill's own orchestrator acting directly for a phase
+  with no dedicated role agent (e.g. `sdlc-dev-workflow` Phases 1–2) — it does not mean the
+  `.claude/agents/lead.md` Lead Agent was invoked; none of the four workflow skills invoke it.
+  `runrecord.py` only counts a row as a human intervention when `Owner` is exactly `human` — any
+  other spelling silently is not counted.
 - **Outcome** — `done`, `failed`, or `awaiting` (a gate not yet answered).
 - **Evidence** — a short reference, not a transcript: `commit:<sha>`, `exit:<code>:<command>`,
   `jira:transitioned`, `approved`, `pr:<url>`, or a path. `runrecord.py` reads `exit:<code>:`

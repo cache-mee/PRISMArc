@@ -36,7 +36,7 @@
 
 ## What is PRISM?
 
-PRISM is a framework that embeds **purpose-built AI agents** directly into your SDLC. Instead of using AI as a chat assistant, PRISM assigns each role in your team — BA, PM, Architect, UX Designer, Developer, QA, Reviewer — a dedicated agent that knows its job, follows your coding rules, connects to your tools, and hands off cleanly to the next agent.
+PRISM is a framework that embeds **purpose-built AI agents** directly into your SDLC. Instead of using AI as a chat assistant, PRISM assigns each role in your team — BA, PM, Architect, UX Designer, Developer, QA, Reviewer — a dedicated agent that knows its job, follows your coding rules, connects to your tools, and hands off cleanly to the next agent. Two more agents work outside the fixed workflow pipeline: **Lead** coordinates complex, multi-agent work on demand, and **Security** runs independent, OWASP-aligned audits standalone or alongside Reviewer.
 
 The result: a team where AI handles the mechanical work of each role, while **humans stay in control through explicit approval gates at every phase boundary**.
 
@@ -51,7 +51,7 @@ The result: a team where AI handles the mechanical work of each role, while **hu
 ║                        PRISM FRAMEWORK                           ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
-║   ◈ LAYER 1 — WORKFLOWS  (the pipelines you invoke)              ║
+║   ◈ LAYER 1 — WORKFLOW SKILLS  (own phase sequencing; the pipelines you invoke) ║
 ║   ┌─────────────────┐  ┌─────────────────────────────────────┐   ║
 ║   │ sdlc-planning   │  │         DEVELOPMENT SIDE            │   ║
 ║   │ ─────────────── │  │  sdlc-dev  →  unit-test  →  qa      │   ║
@@ -66,8 +66,11 @@ The result: a team where AI handles the mechanical work of each role, while **hu
 ║   ┌──────────┐ ┌──────────┐                                      ║
 ║   │  Test    │ │ Reviewer │                                      ║
 ║   └──────────┘ └──────────┘                                      ║
+║   ┌──────────┐ ┌──────────┐   ↑ fixed workflow phases             ║
+║   │   Lead   │ │ Security │   ↓ invoked ad hoc, any time           ║
+║   └──────────┘ └──────────┘                                      ║
 ║                                                                  ║
-║   ◈ LAYER 3 — SKILLS  (bounded capabilities each agent uses)     ║
+║   ◈ LAYER 3 — CAPABILITY SKILLS  (bounded capabilities each agent uses) ║
 ║   bmad-product-brief · bmad-prd · bmad-architecture · bmad-ux    ║
 ║   bmad-create-epics-and-stories · bmad-build · test-design       ║
 ║                                                                  ║
@@ -88,9 +91,97 @@ The result: a team where AI handles the mechanical work of each role, while **hu
 
 | Concept | What it means |
 |---|---|
-| **Agents = Role Players** | Each agent knows its domain and nothing else. The BA doesn't write code. The Developer doesn't design UX. Each agent reads the previous one's output as its input. |
-| **Skills = Bounded Capabilities** | A skill is a single, reusable capability. An agent invokes a skill to do a specific job — writing a brief, designing tests, implementing a task. Skills don't make workflow decisions; agents do. |
+| **Agents = Role Players** | Each agent knows its domain and nothing else. The BA doesn't write code. The Developer doesn't design UX. Each agent reads the previous one's output as its input. Seven agents (BA, PM, Architect, UX Designer, Developer, Test, Reviewer) sit on the fixed workflow pipelines; Lead and Security are invoked ad hoc, outside any one phase. |
+| **Skills = Two Kinds** | **Capability skills** are a single, reusable capability an agent invokes for one job — writing a brief, designing tests, implementing a task — and never decide what runs next. **Workflow skills** (Layer 1: `sdlc-*-workflow`) are the one named exception — each owns the fixed phase sequence of its own SDLC workflow and invokes the applicable agent per phase. |
 | **Gates = Human Control Points** | Every workflow stops at a gate and waits for your explicit reply before proceeding. Gates are never optional. This is how humans stay in control. |
+
+---
+
+## The Agentic Engineering Toolbelt
+
+Agents don't just generate instructions — they operate against the repository
+through a layer of deterministic, reusable engineering tools (`tools/`):
+
+```
+┌─────────────────────────────┐
+│      WORKFLOW SKILL         │   sdlc-*-workflow — owns phase sequencing
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│           AGENT              │   Reason • Decide • Review
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│      CAPABILITY SKILL        │   Reusable procedural knowledge
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│            TOOL              │   Deterministic repo actions
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│       Evidence / State       │
+└─────────────────────────────┘
+```
+
+Tools provide reliable, observable execution and evidence; agents provide the
+reasoning and orchestration on top of them.
+
+### Featured Capabilities
+
+**Scope Check** — mechanically enforces the backend/frontend boundary from this README's Repository Layout, so a change that crosses `B2B_BE/` and `B2B_FE/` fails deterministically instead of relying on an agent to remember the rule. Wired into local pre-commit and CI, and runnable on demand.
+`tools/scope-check/scope-check --staged`
+
+**Worktree Add** — creates an isolated, idempotent git worktree (with standard symlinks) for a ticket's branch, so parallel ticket work never collides in one checkout. Cross-platform, with automatic fallbacks on Windows.
+`tools/worktree-add/worktree-add feature/PROJ-42-user-login`
+
+**Env Check** — lets an agent confirm a credential is configured without ever being able to print its value, closing the "expand-to-value" leak a naive shell check would cause. It's the safe alternative the secret-leak guard hook points to.
+`tools/env-check/env-check <VAR_NAME>`
+
+**Agent Metrics** — measures what an agent run actually cost and did (tokens, cost, rework, human interventions, build status) across independent providers behind one caller, appended to a durable ledger. Its `runrecord` provider is read directly by the `sdlc-*-workflow` skills' Run Record steps, turning workflow evidence into queryable data.
+`tools/agent-metrics/metrics report --by agent`
+
+**Security Audit** — read-only, OWASP-aligned dependency/secret/config checks, normalized into structured findings and a PASS/WARN/BLOCK gate verdict (`.claude/skills/security-audit/`, backing the `security` agent).
+
+### Tool Capability Table
+
+| Capability | Tool(s) | What the Agent Gains |
+|---|---|---|
+| Enforce backend/frontend boundary | `tools/scope-check` | A deterministic PASS/FAIL on whether a diff crosses the repository-layout split |
+| Isolate ticket work | `tools/worktree-add` | A ready, idempotent git worktree so parallel tickets never collide |
+| Check secrets safely | `tools/env-check` | Confirms a credential is set without ever risking printing its value |
+| Measure agent runs | `tools/agent-metrics` | Cost, token, rework and build-status evidence per run, feeding workflow Run Records |
+| OWASP-aligned security gate | `.claude/skills/security-audit` | A structured, evidence-backed PASS/WARN/BLOCK security verdict |
+
+### Example: Tools Composed Inside `sdlc-dev-workflow`
+
+```
+sdlc-dev-workflow (Workflow Skill)
+  │
+  ├── worktree-add          → isolated branch + worktree for the ticket
+  ├── Developer agent        → implements the plan, commits per task
+  ├── scope-check            → validates the diff stays within one folder
+  ├── agent-metrics/runrecord → durable evidence row (cost, exit code) in the Run Record
+  └── Reviewer agent (new session) → reads plan + PR diff, returns PASS/FAIL
+          │
+          ▼
+     Verifiable Result
+```
+
+### Why the Tool Layer Matters
+
+LLMs are good at reasoning, but reliable software execution needs deterministic
+mechanisms. Where a check has a clear right answer — does this diff cross a
+folder boundary, is this credential configured, what did this run actually
+cost — a tool answers it by exit code and evidence, not by an agent's claim.
+
+**Agents reason. Skills provide capabilities. Tools execute deterministically.**
+That separation is what lets this system do more than generate text: it can
+operate against the repository, validate its own changes, record evidence, and
+enforce engineering constraints — and new deterministic capabilities can be
+added under `tools/` without changing the underlying Workflow Skill → Agent →
+Capability Skill → Tool architecture. See `tools/README.md` for the placement
+rule new tools must satisfy.
 
 ---
 
@@ -290,7 +381,9 @@ PRISM maintains three files to track workflow state efficiently:
 salon-app/
 ├── .claude/
 │   ├── agents/              — Role agents (BA, PM, Architect, UX, Developer, Reviewer, QA)
-│   ├── skills/              — Bounded capabilities (bmad-*, sdlc-*, code-review, ...)
+│   │                           + Lead (ad-hoc coordination), Security (OWASP audits)
+│   ├── skills/              — Workflow skills (sdlc-*-workflow, own phase sequencing)
+│   │                           + capability skills (bmad-*, code-review, ...)
 │   └── STANDARDS.md         — Normative operating rules (MUST / MUST NOT)
 ├── .orchestration/
 │   ├── policy/              — Gates, retry limits, circuit breakers
@@ -324,6 +417,7 @@ salon-app/
 | [stack/stack-proposal.md](stack/stack-proposal.md) | Approved tech stack (Flutter + Node.js/TypeScript) |
 | [stack/rules/base-rules.md](stack/rules/base-rules.md) | Coding rules — all agents must follow these |
 | [.claude/STANDARDS.md](.claude/STANDARDS.md) | Normative AI-development operating rules |
+| [tools/README.md](tools/README.md) | The shared deterministic tool layer — what belongs there and why |
 | [docs/adr/ADR-0001-agent-owned-orchestration.md](docs/adr/ADR-0001-agent-owned-orchestration.md) | Why this model was chosen |
 
 ---

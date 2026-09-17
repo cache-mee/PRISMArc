@@ -18,9 +18,15 @@ Contents: 1. Agents · 2. Skills · 3. Tools · 4. Evidence · 5. Handoffs ·
 
 ## 1. Agent standard
 
-Agents own orchestration. An agent's defining question is **"what should happen
-next?"** An agent that cannot answer that question is not an agent — it is a
-skill with a title.
+Agents own orchestration for ad-hoc and cross-workflow work. An agent's
+defining question is **"what should happen next?"** An agent that cannot
+answer that question is not an agent — it is a skill with a title.
+
+Within one of the four named SDLC workflows, that question is instead answered
+by the workflow skill that owns the workflow (see §2, Workflow skills) — an
+agent invoked for a phase of that workflow still decides within its own
+phase-level responsibility, but does not decide which phase or agent comes
+next.
 
 Every agent definition (`.claude/agents/<name>.md`) MUST describe:
 
@@ -61,8 +67,14 @@ the Reviewer's value comes from *not* sharing the Developer's context.
 
 ## 2. Skill standard
 
-A skill is **one bounded, reusable capability** — the procedural knowledge for
-how something is done. Skills describe capabilities, not workflows.
+There are two kinds of skill: **capability skills** (the default — everything
+below applies to these) and **workflow skills** (a narrow, explicitly named
+exception, defined at the end of this section). A skill not named in the
+Workflow skills list below is a capability skill.
+
+A capability skill is **one bounded, reusable capability** — the procedural
+knowledge for how something is done. Capability skills describe capabilities,
+not workflows.
 
 > GOOD: "Implement a bounded software change according to supplied acceptance criteria."
 > BAD: "First call the Lead Agent, then the Test Agent, then the Developer."
@@ -80,7 +92,7 @@ Every skill (`.claude/skills/<skill>/SKILL.md`) MUST define:
 - **Scope** — what it MUST NOT touch.
 - **Tools** — the deterministic operations it may use.
 
-A skill MUST NOT:
+A capability skill MUST NOT:
 
 - orchestrate other agents,
 - own the overall task lifecycle,
@@ -89,13 +101,44 @@ A skill MUST NOT:
 - chain other skills into a fixed sequence (a hidden workflow engine),
 - become a giant "do everything" capability.
 
-A skill MAY report "this failed, here is the evidence, here are the options."
-Choosing among the options belongs to the calling agent.
+A capability skill MAY report "this failed, here is the evidence, here are the
+options." Choosing among the options belongs to the calling agent or, for a
+workflow phase, the workflow skill that owns that phase.
 
-Skills MUST be independently understandable: readable and usable without knowing
-which agent invoked them. Skills SHOULD follow Agent Skills conventions — a
-`SKILL.md` with `name` and `description` frontmatter, with detail progressively
-disclosed into sibling files rather than inlined.
+Capability skills MUST be independently understandable: readable and usable
+without knowing which agent or workflow invoked them. Skills SHOULD follow
+Agent Skills conventions — a `SKILL.md` with `name` and `description`
+frontmatter, with detail progressively disclosed into sibling files rather than
+inlined.
+
+### Workflow skills (named exception)
+
+A **workflow skill** is the one deliberate, bounded exception to "a skill MUST
+NOT orchestrate": it owns the fixed phase sequence of exactly one named SDLC
+workflow, end to end. This repository currently has exactly four:
+`sdlc-planning-workflow`, `sdlc-dev-workflow`, `sdlc-qa-workflow`, and
+`sdlc-unit-test-workflow` (`.claude/skills/<name>/SKILL.md`).
+
+A workflow skill MAY:
+
+- sequence that workflow's predefined phases,
+- decide which agent (or capability skill) to invoke for the current phase,
+- own that workflow's human gates and bounded per-phase retries,
+- maintain that workflow's progression and durable status artifacts.
+
+A workflow skill MUST NOT:
+
+- invent or reorder phases outside its own documented pipeline,
+- decide the sequencing of a *different* named workflow,
+- override the judgement an invoked agent owns within its own phase,
+- become a general-purpose orchestrator for work outside its one named
+  workflow.
+
+This exception does not extend to any other skill. Every other skill — including
+sibling skills a workflow skill invokes, such as `worktree-add`,
+`workflow-status`, `code-review`, `test-design`, `verification`,
+`implementation`, and `requirements` — is a capability skill and remains bound
+by "A capability skill MUST NOT" above.
 
 ---
 
@@ -314,7 +357,15 @@ Simple work:   Agent → Skill → Tool → Evidence
 Complex work:  Lead ── Test
                    ├── Developer
                    └── Reviewer
+
+Named SDLC workflow work (see §2, Workflow skills):
+               Workflow Skill → Agent → Capability Skill / Tool → Evidence
 ```
+
+The named-workflow shape is a separate, parallel path for the four workflow
+skills' own domains, not a variant of Lead delegation — a workflow skill
+invokes agents directly and does not itself invoke, or get invoked by, the
+`lead` agent contract.
 
 - Simple work SHOULD NOT be routed through a Lead. An agent MUST NOT delegate
   merely because a Lead exists.
@@ -384,9 +435,9 @@ Each of these is a MUST NOT.
 persona-driven agents; an agent per technology or domain; premature abstraction;
 a physical directory for every conceptual box.
 
-**Layer violations** — skills that orchestrate; skills that own the task
-lifecycle; tools that make workflow decisions; agents that duplicate a whole
-skill inline.
+**Layer violations** — a capability skill that orchestrates or owns the task
+lifecycle (the four named workflow skills are the sole exception — see §2);
+tools that make workflow decisions; agents that duplicate a whole skill inline.
 
 **Tooling** — a `.claude/tools/` mirror directory; a giant shared `tools/`
 dumping ground; wrappers around native Claude Code capabilities; unnecessary MCP
