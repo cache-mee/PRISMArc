@@ -31,6 +31,18 @@ async def get_bookings_for_staff_in_window(
     return list(result.scalars().all())
 
 
+async def get_booking_by_id(db: AsyncSession, booking_id: int) -> Booking | None:
+    """Return the Booking row matching booking_id, or None if no row exists.
+
+    Needed by app.domain.appointments.cancel_customer_booking (FR-11) to
+    resolve not-found/ownership/already-cancelled before any write is
+    attempted.
+    """
+    stmt = select(Booking).where(Booking.id == booking_id)
+    result = await db.execute(stmt)
+    return result.scalars().first()
+
+
 async def create_booking(
     db: AsyncSession,
     *,
