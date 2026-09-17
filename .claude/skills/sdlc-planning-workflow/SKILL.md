@@ -39,7 +39,9 @@ ambiguous.
 Schema: `.orchestration/schemas/run-record.md`. This record is project-scoped, not
 ticket-scoped, since planning runs before any ticket exists.
 
-- On first use, create `{run_record}` with `Issue: {project_name}`, `State: planning`.
+- On first use, create `{run_record}` with `Issue: {project_name}`, `State: planning`,
+  `Started:` = now, ISO-8601 (`date -u +%Y-%m-%dT%H:%M:%S+00:00`) — set once, at creation,
+  never touched again.
 - After **every** phase below completes, and after every gate reply (`approved` / `revise` /
   `stop`), append one row: `Step` = `[planning] Phase N — Name` (or `[planning] Gate N —
   Name`), `Owner` = `business-analyst` / `product-manager` / `architect` / `ux-designer` for a
@@ -610,6 +612,14 @@ last_completed_phase: 0
 ---
 
 ## Stop Conditions (Any Phase)
+
+Bounded recovery in this workflow follows the same `status.json` + `tools/breaker-check`
+convention defined in `sdlc-dev-workflow`'s "Bounded Recovery" section: on any retry, run
+`tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} --activity <key> --reason
+"<why>" --failure-signal "<signature>" --evidence "<path>"` (never hand-edit `status.json`), then
+run `tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}` before proceeding; a
+non-zero exit stops the retry. (`{run_dir}` here resolves to `.orchestration/runs/{run_id}/`, per
+this file's own conventions above.)
 
 - The user replies `stop` at any gate.
 - A source artefact required by the current phase does not exist on disk.

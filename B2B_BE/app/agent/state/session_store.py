@@ -14,6 +14,7 @@ Context* decision 5, and *Risks*. This is expected to be replaced by
 
 from dataclasses import dataclass, field
 
+from app.domain.availability import ProposedAvailabilityChange
 from app.models.staff import StaffRole
 
 
@@ -36,10 +37,13 @@ class SessionState:
     staff_role: StaffRole | None = None
     manager_resolved: bool = False
 
-    # Conversation history — additive only, added by APPOINTMEN-54 (Booking
-    # Agent conversational loop). Defaults to an empty list so every existing
-    # call site and behavior is unaffected.
+    # Conversation history and pending availability-change fields — additive
+    # only, added by APPOINTMEN-54 (Booking Agent conversational loop) and
+    # APPOINTMEN-55 (Manager Agent conversational loop). All default so every
+    # existing call site and behavior (Booking-Agent-only or otherwise) is
+    # unaffected; see ``app.agent.manager_agent.run_manager_turn``.
     history: list[dict] = field(default_factory=list)
+    pending_availability_change: ProposedAvailabilityChange | None = None
 
 
 _sessions: dict[str, SessionState] = {}

@@ -2,10 +2,10 @@
 <!-- Appended by every sdlc-*-workflow phase and gate that touches this work. Do not hand-edit. -->
 
 Issue:  salon-app
-Branch: n/a
+Branch: chore/APPOINTMEN-60-finalize-hosting
 State:  complete
 Next:   Planning complete — hand off to development workflow when ready
-Task:
+Task:   APPOINTMEN-61
 Confluence: https://experionglobal.atlassian.net/wiki/spaces/AP (8 pages)
 Jira: https://experionglobal.atlassian.net/jira/software/projects/APPOINTMEN/boards (APPOINTMEN-1..52)
 
@@ -30,3 +30,6 @@ Jira: https://experionglobal.atlassian.net/jira/software/projects/APPOINTMEN/boa
 | 17 | [planning] Phase 6 — Confluence Push | human | done | created:8 pages in space AP (brief, PRD, tech stack, 4 UX, epics) | 2026-09-17T00:00:00+00:00 |
 | 18 | [planning] Phase 7 — Jira Push | human | done | created:APPOINTMEN-1..52 (8 epics, 44 stories) | 2026-09-17T00:00:00+00:00 |
 | 19 | [planning] Epics update — scaffolding epic | business-analyst | done | bmad-output/planning-artifacts/epics/epics-salon-app-2026-09-17.md (Epic 0 added, 4 stories, total 44) | 2026-09-17T00:00:00+00:00 |
+| 20 | [planning] Phase 3 — Tech Stack (post-approval revision) | architect | done | stack/stack-proposal.md §5 revision block (2026-09-18) + stack/rules/base-rules.md Infra row/Forbidden bullet — finalized hosting: EC2 t2.micro+Docker (BE), S3+CloudFront (FE), RDS (DB); Gate 3 not reopened | 2026-09-17T21:52:59+00:00 |
+| 21 | [planning] Jira — hosting spec ticket | human | done | created:APPOINTMEN-60 (later deleted by user) | 2026-09-17T21:52:59+00:00 |
+| 22 | [planning] Jira — hosting spec ticket (recreate) | claude | done | created:APPOINTMEN-61 (supersedes deleted APPOINTMEN-60) | 2026-09-17T21:52:59+00:00 |
