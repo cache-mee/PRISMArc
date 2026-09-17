@@ -168,14 +168,14 @@ Do not proceed until the user replies `approved`. On `revise`, the BA agent appl
 
 ## Phase 3: Tech Stack
 
-**Owner:** Architect agent (`bmad-agent-architect` skill)
+**Owner:** Architect agent (`.claude/agents/architect.md`)
 **Skill:** `bmad-architecture` (stack-scoped pass only — full architecture comes post-approval)
 **Input:** Approved PRD
 **Output:** `{stack_root}/stack-proposal.md`
 
 ### Instructions
 
-1. Invoke the Architect agent (`bmad-agent-architect`). Pass it the PRD path.
+1. Invoke the Architect agent. Pass it the PRD path.
 2. The Architect produces `{stack_root}/stack-proposal.md` covering:
    - **Frontend** — recommended framework, language, rationale
    - **Backend** — recommended framework, language, rationale
