@@ -23,6 +23,7 @@ class SessionState:
     customer_id: int | None = None
     customer_name: str | None = None
     resolved: bool = False
+    awaiting_name: bool = False
 
 
 _sessions: dict[str, SessionState] = {}
