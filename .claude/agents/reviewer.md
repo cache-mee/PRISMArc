@@ -97,3 +97,9 @@ scope blocks the objective.
 Review the change, not the repository. Pre-existing issues outside the change are
 recorded as findings for later and MUST NOT block this change unless the change
 makes them materially worse.
+
+Confirm every touched file falls under the correct top-level folder for the
+change's declared backend/frontend classification (`B2B_BE/` or `B2B_FE/`, per
+`CLAUDE.md` → *Repository layout*). A file placed in the wrong folder, or a new
+top-level application folder created outside these two, is a defect — report it
+even if the code itself is otherwise correct.

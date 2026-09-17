@@ -30,6 +30,13 @@ on top and win on conflict.
 
 ## 2. Flutter / Dart Rules
 
+### 2.0 File and Folder Structure
+
+All frontend code lives under the repository's `B2B_FE/` root — never at the
+repository root and never mixed into `B2B_BE/`. See `CLAUDE.md` → *Repository
+layout* for the backend/frontend split this enforces. Standard Flutter project
+layout applies within it: `B2B_FE/lib/`, `B2B_FE/test/`, `B2B_FE/pubspec.yaml`.
+
 ### 2.1 BLoC State Management
 
 - **All application state goes through BLoC or Cubit.** No `setState` for data that originates from the API or that is shared between widgets. `setState` is permitted only for widget-local ephemeral state (e.g., a text field's `FocusNode`).
@@ -159,15 +166,20 @@ Rules derived from this pattern:
 
 ### 3.9 File and Folder Structure
 
+All backend code lives under the repository's `B2B_BE/` root — never at the
+repository root and never mixed into `B2B_FE/`. See `CLAUDE.md` → *Repository
+layout* for the backend/frontend split this enforces.
+
 ```
-src/
-  routes/          — Express routers
-  controllers/     — Request/response handling + Zod validation
-  services/        — Business logic (including SlotService)
-  repositories/    — All database queries
-  middleware/      — Auth, error handling, logging
-  lib/             — Shared utilities (db client, redis client, logger)
-  types/           — Shared TypeScript types and interfaces
+B2B_BE/
+  src/
+    routes/          — Express routers
+    controllers/     — Request/response handling + Zod validation
+    services/        — Business logic (including SlotService)
+    repositories/    — All database queries
+    middleware/      — Auth, error handling, logging
+    lib/             — Shared utilities (db client, redis client, logger)
+    types/           — Shared TypeScript types and interfaces
 ```
 
 - Feature grouping within each layer is by domain (e.g., `services/booking.service.ts`, `services/slot.service.ts`).
@@ -183,7 +195,7 @@ src/
 ### 3.11 TypeScript / Node.js Style
 
 - `camelCase` for variables and functions. `PascalCase` for classes and interfaces. `SCREAMING_SNAKE_CASE` for true constants.
-- No `console.log` in committed code — use the project logger (`src/lib/logger.ts`).
+- No `console.log` in committed code — use the project logger (`B2B_BE/src/lib/logger.ts`).
 - `async/await` over raw `Promise.then` chains.
 - No `require()` — ES module imports only (`import`/`export`).
 
@@ -205,16 +217,17 @@ src/
 
 ## 5. CI Enforcement
 
-The following checks run on every pull request and must pass before merge:
+The following checks run on every pull request and must pass before merge.
+Frontend checks run from `B2B_FE/`; backend checks run from `B2B_BE/`.
 
-| Check | Tool |
-|---|---|
-| Flutter format | `dart format --output=none --set-exit-if-changed .` |
-| Flutter analyse | `flutter analyze` |
-| Flutter tests | `flutter test` |
-| TypeScript compile | `tsc --noEmit` |
-| ESLint | `eslint src/ --max-warnings 0` |
-| Backend tests | `npm test` |
-| Docker build | `docker build .` (verify image builds) |
+| Check | Tool | Run from |
+|---|---|---|
+| Flutter format | `dart format --output=none --set-exit-if-changed .` | `B2B_FE/` |
+| Flutter analyse | `flutter analyze` | `B2B_FE/` |
+| Flutter tests | `flutter test` | `B2B_FE/` |
+| TypeScript compile | `tsc --noEmit` | `B2B_BE/` |
+| ESLint | `eslint src/ --max-warnings 0` | `B2B_BE/` |
+| Backend tests | `npm test` | `B2B_BE/` |
+| Docker build | `docker build .` (verify image builds) | `B2B_BE/` |
 
 No warnings promoted to errors may be suppressed inline without a comment explaining the exception.

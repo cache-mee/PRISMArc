@@ -12,22 +12,55 @@ Orchestration serves the application; it does not reshape it.
 
 ### Application status
 
-As of this scaffold, the repository contains no application source code — only
-this file, `README.md`, and the orchestration infrastructure. When application
-code lands, record the real stack, layout and commands in the table below rather
-than assuming them.
+As of this scaffold, the repository contains no application source code beyond
+the `B2B_BE/` and `B2B_FE/` root folders (see **Repository layout** below), this
+file, `README.md`, and the orchestration infrastructure. When application code
+lands, record the real stack, commands, and any layout detail beyond the
+backend/frontend split in the table below rather than assuming them.
 
 | | |
 |---|---|
-| Stack | *not yet established* |
-| Source layout | *not yet established* |
+| Stack | See `stack/stack-proposal.md` and `stack/rules/base-rules.md` |
+| Source layout | Backend → `B2B_BE/` · Frontend → `B2B_FE/` (see **Repository layout** below and `stack/rules/base-rules.md` §3.9) |
 | Test command | *not yet established* |
 | Build command | *not yet established* |
 | Lint/format command | *not yet established* |
 
-Until these are filled in, an agent MUST discover project commands from the
+Until the commands above are filled in, an agent MUST discover them from the
 repository (package manifests, CI config, existing scripts) and MUST report
 "not validated" rather than inventing a command that does not exist.
+
+### Repository layout
+
+The application is split into two independently-owned top-level folders. This
+split is authoritative and fixed — it is not something any agent re-derives or
+re-proposes per ticket.
+
+| Folder | Owns |
+|---|---|
+| `B2B_BE/` | Backend — APIs, services, data access, business logic, backend tests |
+| `B2B_FE/` | Frontend — UI, client-side logic, frontend tests |
+
+Rules every agent MUST follow:
+
+1. **Classify before writing.** Determine whether a ticket is backend,
+   frontend, or both — from its stated component/label/type first, and from
+   what the acceptance criteria actually change (API/DB/service logic →
+   backend; UI/client behaviour → frontend) if none is stated.
+2. **Confine every file to the matching folder.** All files created or edited
+   for a backend ticket MUST live under `B2B_BE/`; all files for a frontend
+   ticket MUST live under `B2B_FE/`. Do not create a new top-level folder for
+   application code, and do not place backend files in `B2B_FE/` or vice versa.
+3. **Split cross-cutting tickets.** A ticket that genuinely touches both (e.g.
+   a new endpoint plus the UI that calls it) MUST be treated as two bounded
+   changes, one per folder — not one change that reaches across both.
+4. **Ambiguity is a stop condition, not a guess.** If a ticket's classification
+   is genuinely unclear, stop and prompt the user to confirm which folder (or
+   both, as two bounded changes) the ticket belongs to — never guess, and never
+   write to both folders "to be safe." Proceed only once the user confirms.
+
+This governs every agent that reads or writes application code — Developer,
+Test, Reviewer, and Architect alike.
 
 ## How Claude Code works in this repository
 
@@ -87,7 +120,7 @@ Operating rules:
 | Handoff, evidence, status contracts | `.orchestration/schemas/` |
 | Durable run state | `.orchestration/runs/<WORK-ID>/` |
 | Why this model exists | `docs/adr/ADR-0001-agent-owned-orchestration.md` |
-| Application code | wherever the application defines — authoritative |
+| Application code | `B2B_BE/` (backend), `B2B_FE/` (frontend) — see **Repository layout** above |
 
 ## Before changing the orchestration layer
 

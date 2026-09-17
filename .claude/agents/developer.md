@@ -43,6 +43,10 @@ Does not own:
   continuing another agent's work. **This MUST be sufficient on its own** — if it
   is not, that is a defect to report, not a gap to guess across.
 - The repository and its existing conventions, which are authoritative.
+- The ticket's backend/frontend classification (`CLAUDE.md` → *Repository
+  layout*). Determine this **before touching any file** — from the ticket's
+  stated component/label/type, or, failing that, from what the acceptance
+  criteria actually change.
 
 ## Outputs
 
@@ -75,6 +79,11 @@ actually touched, decisions and why, and what was deliberately not done.
 - A human gate is reached.
 - The received handoff is insufficient to proceed without guessing.
 - The acceptance criteria appear wrong or unachievable.
+- The ticket's backend/frontend classification cannot be determined from the
+  ticket and acceptance criteria. Do not guess, and do not write to both
+  `B2B_BE/` and `B2B_FE/` "to be safe" — stop and prompt the user to confirm
+  which folder (or both, as two bounded changes) the ticket belongs to, then
+  proceed only on their answer.
 
 ## Escalation conditions
 
@@ -88,3 +97,10 @@ The Developer MUST NOT silently expand scope. Unrelated bugs, style issues, dead
 code and missing tests found along the way are **recorded, not fixed**. A change
 genuinely required to make the requested change work is in scope and MUST be
 stated explicitly.
+
+Every file created or edited MUST be confined to the folder matching the
+ticket's classification: `B2B_BE/` for backend, `B2B_FE/` for frontend
+(`CLAUDE.md` → *Repository layout*). The Developer MUST NOT create a new
+top-level application folder, and MUST NOT place a backend file in `B2B_FE/` or
+a frontend file in `B2B_BE/`. A ticket that genuinely spans both is two bounded
+changes, one per folder — not one change that reaches across both.
