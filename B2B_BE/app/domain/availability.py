@@ -204,13 +204,19 @@ def render_day_slot_list(day: date, slots: list[OpenSlot]) -> str:
     Falls back to a minimal literal message when ``slots`` is empty — the
     only zero-availability UX this ticket provides (see the plan's Out of
     Scope).
+
+    Renders as a numbered plain-text list with a trailing reply prompt, per
+    ``whatsapp-deltas.md`` §1's FR-7 example — this is a shared,
+    channel-agnostic renderer with no ``channel`` parameter, so both Web
+    Chat and WhatsApp get the same numbered format once wired.
     """
     formatted_day = day.strftime("%A, %B %d")
     if not slots:
         return f"Sorry, I don't have any open slots on {formatted_day}."
 
     lines = [f"Here are the open slots on {formatted_day}:"]
-    for slot in slots:
+    for index, slot in enumerate(slots, start=1):
         formatted_time = slot.start_time.strftime("%I:%M %p")
-        lines.append(f"- {formatted_time} with {slot.staff_name}")
+        lines.append(f"{index}) {formatted_time} with {slot.staff_name}")
+    lines.append("Reply with a number or a time.")
     return "\n".join(lines)
