@@ -22,6 +22,18 @@ for it. Human gates are stops, not suggestions.
 
 ---
 
+## Communication Style (automatic)
+
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces — status updates, phase
+narration — automatically, for the whole run. No `/caveman` command needed; do not wait for the
+user to ask. It never applies to persisted artefacts (the brief, PRD, epics/stories,
+`{run_record}` rows) and it auto-drops for gate prompts and irreversible-action confirmations,
+per that skill's own Boundaries and Auto-Clarity rules, so it never makes a human gate
+ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`. This record is project-scoped, not
@@ -33,7 +45,8 @@ ticket-scoped, since planning runs before any ticket exists.
   Name`), `Owner` = `business-analyst` / `product-manager` / `architect` / `ux-designer` for a
   phase, or exactly `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`,
   `Evidence` = the artefact path just produced (or `approved` / `revise` for a gate), `At` =
-  now, ISO-8601.
+  now, ISO-8601 — get the real current time by running `date -u +%Y-%m-%dT%H:%M:%S+00:00`;
+  never approximate or pad to midnight.
 - When Phase 7 (or the last enabled phase) completes, set `State: complete`. On a `stop` reply
   at any gate, set `State: stopped` instead.
 - When Phase 7 pushes tickets to Jira, record each created ticket key in that row's `Evidence`

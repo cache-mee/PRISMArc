@@ -1,8 +1,8 @@
 ---
 title: Addendum — Agentic Appointment Management Engine — Salon Edition
 status: draft
-created: 2026-09-17
-updated: 2026-09-17
+created: 2026-09-17T00:00:00+00:00
+updated: 2026-09-17T00:00:00+00:00
 ---
 
 # Addendum: Agentic Appointment Management Engine — Salon Edition

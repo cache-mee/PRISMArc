@@ -22,6 +22,18 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 
 ---
 
+## Communication Style (automatic)
+
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces — status updates, phase
+narration, plan summaries shown inline — automatically, for the whole run. No `/caveman`
+command needed; do not wait for the user to ask. It never applies to persisted artefacts
+(`{plan_file}`, `{review_file}`, commit messages, PR bodies, Jira comments, `{run_record}` rows)
+and it auto-drops for gate prompts and irreversible-action confirmations, per that skill's own
+Boundaries and Auto-Clarity rules, so it never makes a human gate ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`.
@@ -34,7 +46,9 @@ Schema: `.orchestration/schemas/run-record.md`.
   `[dev] Phase N — Name` (or `[dev] Gate N — Name`), `Owner` = `lead` (Phases 1–2) /
   `developer` (Phases 3–4) / `reviewer` (Phase 6), or exactly `human` for a gate reply,
   `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` / `exit:<code>:<cmd>`
-  / `jira:transitioned` / `pr:<url>` / `approved` as applicable, `At` = now, ISO-8601.
+  / `jira:transitioned` / `pr:<url>` / `approved` as applicable, `At` = now, ISO-8601 — get the
+  real current time by running `date -u +%Y-%m-%dT%H:%M:%S+00:00`; never approximate or pad to
+  midnight.
 - `State` stays `in-development` throughout this workflow — the next workflow to touch
   `{run_record}` (`sdlc-unit-test-workflow`) is what advances it. Set `State: stopped` if the
   user replies `stop` at any gate.

@@ -16,6 +16,21 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill is owned by QA — not t
 - `{pr_url}` is the GitHub PR URL for this ticket.
 - Integration tests test **boundaries** — two or more real components working together. They do not mock everything; they mock only external services (third-party APIs, email, payments).
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
+- Any `started` / `updated` / `last_updated` timestamp written to `current.md` or `status.md` is
+  the real current time, captured by running `date -u +%Y-%m-%dT%H:%M:%S+00:00` — never
+  approximate, and never a date-only value.
+
+---
+
+## Communication Style (automatic)
+
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces — most valuable while
+reading the PR diff and running/interpreting integration tests — automatically, for the whole
+run. No `/caveman` command needed; do not wait for the user to ask. It never applies to
+persisted artefacts (the test plan, `{run_record}` rows, the Jira PASS/FAIL comment) and it
+auto-drops for gate prompts and irreversible-action confirmations, per that skill's own
+Boundaries and Auto-Clarity rules, so it never makes a human gate ambiguous.
 
 ---
 
@@ -30,7 +45,8 @@ than creating a new file.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[qa] Phase N — Name` (or `[qa] Gate N — Name`), `Owner` = `test`, or exactly `human` for a
   gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` /
-  `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601.
+  `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601 — get the real current time by
+  running `date -u +%Y-%m-%dT%H:%M:%S+00:00`; never approximate or pad to midnight.
 - On QA **PASS** (Phase 4), set `State: complete` — this is the row that closes the ticket's
   whole SDLC journey across all three development-side workflows.
 - On QA **FAIL** (Phase 4), keep `State: qa` and set `Next:` to name the failing tests the

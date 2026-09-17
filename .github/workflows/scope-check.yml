@@ -1,0 +1,34 @@
+name: Scope Check
+
+# Mechanical backstop for CLAUDE.md's Repository layout rule: fails a PR whose
+# diff touches both B2B_BE/ and B2B_FE/. Runs regardless of whether the change
+# went through /sdlc-dev-workflow or the local pre-commit hook (.githooks/pre-commit)
+# — this is the check that always holds.
+# See tools/scope-check/README.md.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  scope-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run scope-check
+        run: |
+          tools/scope-check/scope-check \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}"

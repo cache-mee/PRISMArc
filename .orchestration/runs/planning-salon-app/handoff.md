@@ -3,6 +3,9 @@
 ## Work ID
 planning-salon-app
 
+## Last Updated
+2026-09-17T00:00:00+00:00
+
 ## Objective
 Hand off the finalized UX specification for the Booking Agent (Web Chat + WhatsApp), Manager Agent (Web
 Chat + WhatsApp), and Owner Dashboard to the Architect and Developer agents, so Phase 5 (epics/stories,
