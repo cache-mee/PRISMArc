@@ -2,6 +2,7 @@ from app.models.availability import Availability
 from app.models.base import Base
 from app.models.booking import Booking
 from app.models.customer import Customer
+from app.models.salon import Salon
 from app.models.service import Service
 from app.models.staff import Staff, StaffRole
 
@@ -10,6 +11,7 @@ __all__ = [
     "Base",
     "Booking",
     "Customer",
+    "Salon",
     "Service",
     "Staff",
     "StaffRole",
