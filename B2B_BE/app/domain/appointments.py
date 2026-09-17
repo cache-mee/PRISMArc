@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
-from app.repositories.bookings import create_booking
+from app.repositories.bookings import cancel_booking, create_booking, get_booking_by_id
 from app.repositories.staff_repository import get_staff_by_name
 
 if TYPE_CHECKING:
@@ -22,6 +22,18 @@ class BookingNotConfirmedError(ValueError):
 
 class StaffNotFoundError(ValueError):
     """Raised when the candidate's ``staff_name`` cannot be resolved to a Staff row."""
+
+
+class BookingNotFoundError(ValueError):
+    """Raised when a ``booking_id`` does not resolve to any Booking row."""
+
+
+class BookingNotOwnedError(ValueError):
+    """Raised when the resolved Booking's ``customer_id`` does not match the caller's."""
+
+
+class BookingAlreadyCancelledError(ValueError):
+    """Raised when the resolved Booking's ``status`` is already ``"cancelled"``."""
 
 
 class ResolvedBookingCandidate(BaseModel):
@@ -90,3 +102,43 @@ async def confirm_and_create_booking(
         service_name=candidate.service_name,
         start_time=candidate.start_time,
     )
+
+
+async def cancel_customer_booking(
+    db: AsyncSession, *, booking_id: int, customer_id: int
+) -> Booking:
+    """Cancel an existing Booking on behalf of the requesting Customer (FR-11).
+
+    Resolves ``booking_id`` via ``get_booking_by_id`` and raises rather than
+    silently no-op'ing when the request cannot be satisfied:
+
+    - ``BookingNotFoundError`` if ``booking_id`` does not resolve to any row.
+    - ``BookingNotOwnedError`` if the resolved booking's ``customer_id`` does
+      not match ``customer_id``.
+    - ``BookingAlreadyCancelledError`` if the resolved booking's ``status``
+      is already ``"cancelled"``.
+
+    Otherwise immediately delegates to ``cancel_booking`` and returns the
+    updated row. Per the ticket's explicit note (unlike FR-9/FR-18/FR-27),
+    there is no confirmation flag or confirmation step here — cancellation
+    executes on request.
+    """
+    booking = await get_booking_by_id(db, booking_id)
+    if booking is None:
+        raise BookingNotFoundError(
+            f"No Booking record found for booking_id={booking_id!r}."
+        )
+
+    if booking.customer_id != customer_id:
+        raise BookingNotOwnedError(
+            f"Booking booking_id={booking_id!r} is not owned by customer_id={customer_id!r}."
+        )
+
+    if booking.status == "cancelled":
+        raise BookingAlreadyCancelledError(
+            f"Booking booking_id={booking_id!r} is already cancelled."
+        )
+
+    cancelled = await cancel_booking(db, booking_id=booking_id)
+    assert cancelled is not None  # booking_id was just resolved above
+    return cancelled
