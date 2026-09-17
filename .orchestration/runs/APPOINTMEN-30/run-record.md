@@ -4,7 +4,7 @@
 Issue:  APPOINTMEN-30
 Branch: feature/APPOINTMEN-30-31-fr-25-state-an-availability-change-in
 State:  complete
-Next:   Manual step required: create PR (gh CLI unavailable) — `gh pr create --base develop --head feature/APPOINTMEN-30-31-fr-25-state-an-availability-change-in ...` — then merge. Per standing fast-mode override, sdlc-unit-test-workflow and sdlc-qa-workflow were NOT run; Jira left at "In QA" (indeterminate), not advanced to a done-category status, since no actual QA occurred.
+Next:   Merge PR #29 into develop. Per standing fast-mode override, sdlc-unit-test-workflow and sdlc-qa-workflow were NOT run; Jira left at "In QA" (indeterminate), not advanced to a done-category status, since no actual QA occurred.
 
 | # | Step | Owner | Outcome | Evidence | At |
 |---|---|---|---|---|---|
@@ -26,4 +26,7 @@ Next:   Manual step required: create PR (gh CLI unavailable) — `gh pr create -
 | 16 | [dev] Phase 5 — Jira transition + comment | lead | done | jira:transitioned:In Review; jira:commented (238293, honest disclosure of no auto-PR and no unit/QA testing) | 2026-09-17T16:10:00+00:00 |
 | 17 | [dev] Phase 6 — Code Review | reviewer | done | development/plans/APPOINTMEN-30-review.md (PASS: 0 CRITICAL, 0 MAJOR, 0 MINOR, 0 NITPICK); commit:a6d2d35 (rebased to 6e8e2f0) | 2026-09-17T16:20:00+00:00 |
 | 18 | [dev] Gate — Review Passed / Jira transition | human | done | fast-mode:auto-approved; jira:commented (238294); jira:transitioned:In QA (indeterminate, not done-category — QA workflow not run) | 2026-09-17T16:22:00+00:00 |
-| 19 | [dev] User override — skip unit-test/QA workflow chaining | human | done | standing fast-mode memory (hackathon time constraint) — sdlc-unit-test-workflow and sdlc-qa-workflow deliberately not invoked; PR creation left as a manual step (gh CLI unavailable) | 2026-09-17T16:22:00+00:00 |
+| 19 | [dev] User override — skip unit-test/QA workflow chaining | human | done | standing fast-mode memory (hackathon time constraint) — sdlc-unit-test-workflow and sdlc-qa-workflow deliberately not invoked | 2026-09-17T16:22:00+00:00 |
+| 20 | [dev] Phase 4 — rebase onto develop (3rd concurrent advance) + push | lead | done | rebase clean (APPOINTMEN-53 frontend commit, no overlap); push cda4d1e..e084ca3 | 2026-09-17T16:35:00+00:00 |
+| 21 | [dev] Phase 5 — Pull Request | lead | done | gh CLI found installed but not linked on PATH (/opt/homebrew/Cellar/gh/2.101.0/bin/gh); already authenticated via keyring; pr:https://github.com/cache-mee/PRISMArc/pull/29 | 2026-09-17T16:39:00+00:00 |
+| 22 | [dev] Phase 5 — Jira comment (PR link) | lead | done | jira:commented (238297) | 2026-09-17T16:39:00+00:00 |

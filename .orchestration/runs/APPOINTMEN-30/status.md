@@ -2,7 +2,7 @@
 
 Summary: 3.1 FR-25: State an availability change in natural language
 Branch:  feature/APPOINTMEN-30-31-fr-25-state-an-availability-change-in
-PR:      not yet raised — gh CLI unavailable in this environment; manual command given to user (see Notes)
+PR:      https://github.com/cache-mee/PRISMArc/pull/29 (base: develop)
 
 ## You Are Here
 Workflow: sdlc-dev-workflow
@@ -18,7 +18,7 @@ Next:     Manual: create PR (gh CLI unavailable, see Notes for exact command), t
 [✓] Phase 3 — Implementation Plan (revised once for concurrent-merge conflict)
 [✓] Gate 3 — Plan Review (fast-mode auto-approved)
 [✓] Phase 4 — Code Implementation
-[✗] Phase 5 — Pull Request (gh CLI unavailable, not auto-created — manual step required)
+[✓] Phase 5 — Pull Request (PR #29)
 [✓] Phase 6 — Code Review (PASS: 0/0/0/0)
 
 ### sdlc-unit-test-workflow
@@ -63,8 +63,8 @@ Manual PR command for the user to run:
   gh pr create --title "APPOINTMEN-30: 3.1 FR-25: State an availability change in natural language" --base develop --head feature/APPOINTMEN-30-31-fr-25-state-an-availability-change-in --body "See development/plans/APPOINTMEN-30-implementation-plan.md. Implements FR-25 NL extraction of staff availability block/unblock requests, producing a ProposedAvailabilityChange (confirmed=False) attributed to the resolved speaker. Jira: https://experionglobal.atlassian.net/browse/APPOINTMEN-30"
 
 ## Issues & Blockers
-(open, by design) Phase 5   gh CLI not installed and no GITHUB_TOKEN in this environment   PR must be created manually with the command above; branch is pushed and ready
-(open, by design) Phase 7   No unit tests or QA integration tests run for this ticket   Explicit standing user override due to hackathon time constraints; disclosed honestly in Jira comments 238293/238294; Jira left at "In QA" (not a done-category status) rather than falsely advanced
+(resolved) Phase 5   `gh` initially appeared unavailable (not on PATH)   Found installed via Homebrew but unlinked (/opt/homebrew/Cellar/gh/2.101.0/bin/gh); already authenticated via keyring. Ran directly, then it resolved on PATH normally. PR #29 created.
+(open, by design) Phase 7   No unit tests or QA integration tests run for this ticket   Explicit standing user override due to hackathon time constraints; disclosed honestly in Jira comments 238293/238294/238297; Jira left at "In QA" (not a done-category status) rather than falsely advanced
 
 ## How to Resume
-Code review PASSED (0/0/0/0). Branch feature/APPOINTMEN-30-31-fr-25-state-an-availability-change-in is pushed and rebased onto the current develop tip as of this write. To finish: run the `gh pr create` command above (or create the PR via the GitHub UI, base=develop), then merge. sdlc-unit-test-workflow and sdlc-qa-workflow were never run for APPOINTMEN-30 — if that coverage is wanted later, run them manually against this branch. Note: `develop` was advancing rapidly from other concurrent tickets during this run (APPOINTMEN-31, APPOINTMEN-33, APPOINTMEN-19 all landed mid-session) — re-check for new conflicts before merging if significant time has passed.
+Code review PASSED (0/0/0/0). PR #29 (https://github.com/cache-mee/PRISMArc/pull/29) is open against develop, branch rebased onto the current develop tip as of this write. To finish: merge PR #29. sdlc-unit-test-workflow and sdlc-qa-workflow were never run for APPOINTMEN-30 — if that coverage is wanted later, run them manually against this branch. Note: `develop` was advancing rapidly from other concurrent tickets during this run (APPOINTMEN-31, APPOINTMEN-33, APPOINTMEN-19, APPOINTMEN-53 all landed mid-session) — re-check for new conflicts before merging if significant time has passed.
