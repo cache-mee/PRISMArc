@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -12,6 +12,7 @@ from app.repositories.availability import get_blocking_availability_for_staff_in
 from app.repositories.bookings import (
     create_booking,
     get_booking_by_id,
+    get_bookings_with_staff_for_customer,
     set_booking_status,
 )
 from app.repositories.staff_repository import get_staff_by_name, list_bookable_staff
@@ -134,6 +135,55 @@ async def confirm_and_create_booking(
         start_time=candidate.start_time,
         commit=commit,
     )
+
+
+class BookingHistoryItem(BaseModel):
+    """One booking as shown in a Customer's history (FR-10)."""
+
+    booking_id: int
+    service_name: str
+    staff_name: str
+    start_time: datetime
+    status: str
+
+
+class BookingHistory(BaseModel):
+    """A Customer's bookings, split into upcoming and past (FR-10)."""
+
+    upcoming: list[BookingHistoryItem]
+    past: list[BookingHistoryItem]
+
+
+async def get_booking_history(db: AsyncSession, *, customer_id: int) -> BookingHistory:
+    """Return customer_id's own booking history, split into upcoming/past.
+
+    Reads through app.repositories.bookings.get_bookings_with_staff_for_customer
+    (the sole enforcement point for "never another customer's bookings"), then
+    partitions the rows using datetime.now(UTC) as the boundary: a start_time
+    at or after now is "upcoming", otherwise "past". This is the single place
+    FR-10's "distinguishes upcoming from past" AC is satisfied, decoupled from
+    any specific transport — both the REST endpoint and the future Booking
+    Agent tool call this unchanged.
+    """
+    rows = await get_bookings_with_staff_for_customer(db, customer_id=customer_id)
+    now = datetime.now(UTC)
+
+    upcoming: list[BookingHistoryItem] = []
+    past: list[BookingHistoryItem] = []
+    for booking, staff_name in rows:
+        item = BookingHistoryItem(
+            booking_id=booking.id,
+            service_name=booking.service_name,
+            staff_name=staff_name,
+            start_time=booking.start_time,
+            status=booking.status,
+        )
+        if booking.start_time >= now:
+            upcoming.append(item)
+        else:
+            past.append(item)
+
+    return BookingHistory(upcoming=upcoming, past=past)
 
 
 async def reschedule_booking(
