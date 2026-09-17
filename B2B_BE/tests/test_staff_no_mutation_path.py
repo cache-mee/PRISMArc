@@ -20,9 +20,11 @@ _SAFE_HTTP_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 _MUTATION_VERB_PREFIXES = ("create_", "add_", "update_", "edit_", "delete_", "remove_")
 
-_ALLOWED_STAFF_TOOL_CALLABLES = {"resolve_staff_identity"}
+_ALLOWED_STAFF_TOOL_CALLABLES = {"resolve_staff_identity", "list_bookable_staff_names"}
 
 _ALLOWED_STAFF_REPOSITORY_CALLABLES = {
+    "list_bookable_staff",
+    "list_dashboard_staff",
     "get_staff_by_phone_number",
     "get_staff_by_name",
 }
