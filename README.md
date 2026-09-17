@@ -94,6 +94,94 @@ The result: a team where AI handles the mechanical work of each role, while **hu
 
 ---
 
+## The Agentic Engineering Toolbelt
+
+Agents don't just generate instructions — they operate against the repository
+through a layer of deterministic, reusable engineering tools (`tools/`):
+
+```
+┌─────────────────────────────┐
+│      WORKFLOW SKILL         │   sdlc-*-workflow — owns phase sequencing
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│           AGENT              │   Reason • Decide • Review
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│      CAPABILITY SKILL        │   Reusable procedural knowledge
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│            TOOL              │   Deterministic repo actions
+└──────────────┬──────────────┘
+               │
+┌──────────────▼──────────────┐
+│       Evidence / State       │
+└─────────────────────────────┘
+```
+
+Tools provide reliable, observable execution and evidence; agents provide the
+reasoning and orchestration on top of them.
+
+### Featured Capabilities
+
+**Scope Check** — mechanically enforces the backend/frontend boundary from this README's Repository Layout, so a change that crosses `B2B_BE/` and `B2B_FE/` fails deterministically instead of relying on an agent to remember the rule. Wired into local pre-commit and CI, and runnable on demand.
+`tools/scope-check/scope-check --staged`
+
+**Worktree Add** — creates an isolated, idempotent git worktree (with standard symlinks) for a ticket's branch, so parallel ticket work never collides in one checkout. Cross-platform, with automatic fallbacks on Windows.
+`tools/worktree-add/worktree-add feature/PROJ-42-user-login`
+
+**Env Check** — lets an agent confirm a credential is configured without ever being able to print its value, closing the "expand-to-value" leak a naive shell check would cause. It's the safe alternative the secret-leak guard hook points to.
+`tools/env-check/env-check <VAR_NAME>`
+
+**Agent Metrics** — measures what an agent run actually cost and did (tokens, cost, rework, human interventions, build status) across independent providers behind one caller, appended to a durable ledger. Its `runrecord` provider is read directly by the `sdlc-*-workflow` skills' Run Record steps, turning workflow evidence into queryable data.
+`tools/agent-metrics/metrics report --by agent`
+
+**Security Audit** — read-only, OWASP-aligned dependency/secret/config checks, normalized into structured findings and a PASS/WARN/BLOCK gate verdict (`.claude/skills/security-audit/`, backing the `security` agent).
+
+### Tool Capability Table
+
+| Capability | Tool(s) | What the Agent Gains |
+|---|---|---|
+| Enforce backend/frontend boundary | `tools/scope-check` | A deterministic PASS/FAIL on whether a diff crosses the repository-layout split |
+| Isolate ticket work | `tools/worktree-add` | A ready, idempotent git worktree so parallel tickets never collide |
+| Check secrets safely | `tools/env-check` | Confirms a credential is set without ever risking printing its value |
+| Measure agent runs | `tools/agent-metrics` | Cost, token, rework and build-status evidence per run, feeding workflow Run Records |
+| OWASP-aligned security gate | `.claude/skills/security-audit` | A structured, evidence-backed PASS/WARN/BLOCK security verdict |
+
+### Example: Tools Composed Inside `sdlc-dev-workflow`
+
+```
+sdlc-dev-workflow (Workflow Skill)
+  │
+  ├── worktree-add          → isolated branch + worktree for the ticket
+  ├── Developer agent        → implements the plan, commits per task
+  ├── scope-check            → validates the diff stays within one folder
+  ├── agent-metrics/runrecord → durable evidence row (cost, exit code) in the Run Record
+  └── Reviewer agent (new session) → reads plan + PR diff, returns PASS/FAIL
+          │
+          ▼
+     Verifiable Result
+```
+
+### Why the Tool Layer Matters
+
+LLMs are good at reasoning, but reliable software execution needs deterministic
+mechanisms. Where a check has a clear right answer — does this diff cross a
+folder boundary, is this credential configured, what did this run actually
+cost — a tool answers it by exit code and evidence, not by an agent's claim.
+
+**Agents reason. Skills provide capabilities. Tools execute deterministically.**
+That separation is what lets this system do more than generate text: it can
+operate against the repository, validate its own changes, record evidence, and
+enforce engineering constraints — and new deterministic capabilities can be
+added under `tools/` without changing the underlying Workflow Skill → Agent →
+Capability Skill → Tool architecture. See `tools/README.md` for the placement
+rule new tools must satisfy.
+
+---
+
 ## The Five Workflows
 
 ```
@@ -325,6 +413,7 @@ salon-app/
 | [stack/stack-proposal.md](stack/stack-proposal.md) | Approved tech stack (Flutter + Node.js/TypeScript) |
 | [stack/rules/base-rules.md](stack/rules/base-rules.md) | Coding rules — all agents must follow these |
 | [.claude/STANDARDS.md](.claude/STANDARDS.md) | Normative AI-development operating rules |
+| [tools/README.md](tools/README.md) | The shared deterministic tool layer — what belongs there and why |
 | [docs/adr/ADR-0001-agent-owned-orchestration.md](docs/adr/ADR-0001-agent-owned-orchestration.md) | Why this model was chosen |
 
 ---
