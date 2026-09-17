@@ -17,6 +17,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.agent.availability_intent import parse_availability_change
+from app.agent.catalog_intent import is_catalog_change_request
 from app.domain.availability import ProposedAvailabilityChange
 from app.domain.dashboard_access import decline_staff_dashboard_request
 from app.models.staff import StaffRole
@@ -26,6 +27,10 @@ _ROLE_LABELS: dict[StaffRole, str] = {
     StaffRole.OWNER_ADMIN: "Owner/Admin",
     StaffRole.STAFF: "Staff",
 }
+
+_STAFF_CATALOG_BOUNDARY_REDIRECT = (
+    "That's something Ramesh manages — I can help you with your own availability."
+)
 
 _ROLE_GREETINGS: dict[StaffRole, str] = {
     StaffRole.OWNER_ADMIN: "Hi {name}! Want to update the service catalog?",
@@ -95,6 +100,28 @@ def build_proposed_availability_change(
     explicit confirmation is Story 3.3, not built here.
     """
     return parse_availability_change(message, staff_name=speaker.name, now=now)
+
+
+def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
+    """Redirect a Staff-identified speaker away from an Owner/Admin-only catalog change (FR-28).
+
+    This is the hook point a future conversational Manager Agent loop calls once a phone
+    number has already been resolved to a ``SpeakerContext`` (via ``resolve_speaker``), ahead
+    of any other intent handling for the message. Returns the fixed UX-spec redirect string
+    when ``speaker.role`` is ``StaffRole.STAFF`` and ``message`` is classified as a catalog-change
+    request (``is_catalog_change_request``); returns ``None`` otherwise — for an Owner/Admin
+    speaker (Ramesh is allowed to manage the catalog, Epic 4, not built here) or for a Staff
+    message that is not a catalog-change request, in which case the caller should continue with
+    other intent handling (e.g. FR-25's ``build_proposed_availability_change``).
+
+    The returned string is always the fixed redirect copy — never templated from ``message`` or
+    ``speaker.name`` — matching the "plain one-line redirect, not an error state" decision, the
+    same reasoning already applied to keeping identity/content out of free text elsewhere in this
+    module.
+    """
+    if speaker.role is StaffRole.STAFF and is_catalog_change_request(message):
+        return _STAFF_CATALOG_BOUNDARY_REDIRECT
+    return None
 
 
 def respond_to_dashboard_request(speaker: SpeakerContext) -> str | None:
