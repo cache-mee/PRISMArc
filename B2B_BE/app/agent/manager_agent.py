@@ -34,6 +34,15 @@ not-yet-resolved session it calls ``resolve_speaker``/``render_identity_greeting
 a match; on an already-resolved session it returns a short placeholder instead
 of re-resolving, mirroring ``booking_agent``'s ``_ALREADY_RESOLVED_PLACEHOLDER``
 pattern.
+
+APPOINTMEN-55 (FR-25/FR-27, Manager Agent conversational loop) adds
+``render_proposed_availability_change_restatement`` — the restate half of the
+FR-27 restate-then-confirm sequence for a pending ``ProposedAvailabilityChange``,
+mirroring ``render_proposed_service_change_restatement``'s shape. It is called
+by ``app.tools.availability_change.propose_availability_change`` (the
+LLM-callable tool that builds the pending change and stores it on the
+session), ahead of ``app.tools.availability_change.confirm_availability_change``
+ever calling ``confirm_and_apply_availability_change``.
 """
 
 import logging
@@ -238,6 +247,36 @@ def render_proposed_service_change_restatement(
         )
     return (
         f"You're removing service {proposed.service_id!r} from the catalog. "
+        "Shall I confirm this?"
+    )
+
+
+def render_proposed_availability_change_restatement(
+    change: ProposedAvailabilityChange,
+) -> str:
+    """Render the human-readable restatement of a pending availability change (FR-25/FR-27).
+
+    Mirrors ``render_proposed_service_change_restatement``'s shape: dispatches on
+    ``change.blocked`` to produce copy distinct for a block (marking a window
+    unavailable) versus an unblock (reopening a previously-blocked window),
+    naming ``change.staff_name`` and the exact ``[start_time, end_time)``
+    window. Every branch ends in an explicit ask for confirmation — the
+    "restate" half of FR-27's restate-then-confirm sequence that
+    ``confirm_and_apply_availability_change`` (``app.domain.availability``)
+    ultimately gates on. Pure function, no I/O, no DB access — matches the
+    style of this module's ``render_identity_greeting``/``describe_speaker``.
+    """
+    window = (
+        f"{change.start_time.strftime('%A, %B %d %I:%M %p')} to "
+        f"{change.end_time.strftime('%I:%M %p')}"
+    )
+    if change.blocked:
+        return (
+            f"You're blocking out {window} for {change.staff_name}. "
+            "Shall I confirm this?"
+        )
+    return (
+        f"You're unblocking {window} for {change.staff_name}. "
         "Shall I confirm this?"
     )
 
