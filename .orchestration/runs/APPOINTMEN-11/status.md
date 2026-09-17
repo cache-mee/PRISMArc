@@ -6,9 +6,9 @@ PR:      https://github.com/cache-mee/PRISMArc/pull/15
 
 ## You Are Here
 Workflow: sdlc-dev-workflow
-Phase:    Phase 6 — Code Review
-Waiting:  user reply on next-stage Jira transition (never Done — QA hasn't run)
-Next:     On "yes", transition Jira to next in-progress status (e.g. Ready for QA)
+Phase:    Phase 6 — Code Review (PASS) — handed off
+Waiting:  n/a
+Next:     new session: /sdlc-unit-test-workflow APPOINTMEN-11, then /sdlc-qa-workflow APPOINTMEN-11
 
 ## Phase Tracker
 
@@ -51,9 +51,10 @@ c9a600e   APPOINTMEN-11: add trailing newline to .gitignore
 ## Jira Transitions
 Start Dev          →   In Development   [done]
 Ready for Review   →   In Review        [done]
+Ready for QA       →   In QA            [done]
 
 ## Issues & Blockers
 (resolved) Phase 4/6   Docker unavailable in original execution environment   Resolved: Docker Desktop installed, full compose up/down evidence captured 2026-09-17T12:45:00+00:00, re-review PASSED
 
 ## How to Resume
-Ticket is at the review-passed gate. Reply to the "move to next in-progress Jira status" question, then next steps are sdlc-unit-test-workflow then sdlc-qa-workflow for APPOINTMEN-11.
+sdlc-dev-workflow is complete for this ticket. New session: /sdlc-unit-test-workflow APPOINTMEN-11, then /sdlc-qa-workflow APPOINTMEN-11.
