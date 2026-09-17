@@ -32,13 +32,18 @@
 |---|---|---|---|---|---|---|
 | — | — | — | — | — | — | — |
 
+> Note: a planning run also exists at `.orchestration/runs/planning-salon-app/`, tracked in its
+> own `workflow-status.md` rather than this file's Planning Phase table above — that table is not
+> currently kept in sync by `sdlc-planning-workflow` and is a known separate gap, out of scope
+> for this fix.
+
 ---
 
 ## Completed Tickets
 
 | Ticket | Summary | Branch | PR | QA Verdict | Completed |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| APPOINTMEN-10 | 0.2 Frontend project scaffolding | feature/APPOINTMEN-10-02-frontend-project-scaffolding | [#13](https://github.com/cache-mee/PRISMArc/pull/13) — MERGED into develop (a356f67) | PASS (17/19, 2 not validated — Docker build unverified) | 2026-09-17 |
 
 ---
 
@@ -67,4 +72,4 @@
 
 ---
 
-*Last updated: {YYYY-MM-DD} by {workflow name}*
+*Last updated: 2026-09-17 by sdlc-qa-workflow*
