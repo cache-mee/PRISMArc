@@ -11,9 +11,9 @@ out of scope here) — the resolution logic itself never forks per channel.
 from sqlalchemy.orm import Session
 
 from app.models.customer import Customer
-from app.repositories.customers import get_by_phone
+from app.repositories.customers import get_customer_by_phone
 
 
 def resolve_customer_by_phone(db: Session, phone_number: str) -> Customer | None:
     """Return the ``Customer`` matching ``phone_number``, or ``None``."""
-    return get_by_phone(db, phone_number)
+    return get_customer_by_phone(db, phone_number)

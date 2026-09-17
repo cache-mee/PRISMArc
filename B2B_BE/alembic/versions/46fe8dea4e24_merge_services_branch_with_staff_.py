@@ -1,8 +1,8 @@
-"""merge customers and staff branches
+"""merge services branch with staff/customers/bookings branch
 
-Revision ID: 83508f3f3cb4
-Revises: 35506c641032, 8aac3e937d39
-Create Date: 2026-09-17 20:10:29.232220
+Revision ID: 46fe8dea4e24
+Revises: 0001, c8354b5d4b5c
+Create Date: 2026-09-17 20:24:23.446107
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '83508f3f3cb4'
-down_revision: Union[str, Sequence[str], None] = ('35506c641032', '8aac3e937d39')
+revision: str = '46fe8dea4e24'
+down_revision: Union[str, Sequence[str], None] = ('0001', 'c8354b5d4b5c')
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
