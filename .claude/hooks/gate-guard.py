@@ -20,11 +20,17 @@ those gates that are reliably detectable from a shell command string alone:
   release                  git tag ... && git push ... (tag-then-push in one command)
   dependency-change        npm/pnpm/yarn install|add|remove <pkg>, pip install <pkg>
                            (not -r requirements.txt), poetry/uv/cargo/bundle add|remove
+  destructive-operation    aws CLI calls that terminate/delete an EC2 instance,
+                           security group or key pair, delete/empty an S3 bucket,
+                           delete a CloudFront distribution, or delete an RDS
+                           instance/cluster (the deploy agent's `aws` environment
+                           — see .claude/agents/deploy.md — must never do these
+                           without a human running the command directly)
 
 Deliberately narrow: this does not attempt to catch every gate in
 gates.json (e.g. production-deploy, external-action, scope-expansion,
 architecture-change require judgement a regex cannot supply) — only the
-six patterns above.
+seven patterns above.
 
 Unlike `secret-leak-guard.py` (documented fail-open), this hook is
 fail-closed: any unexpected internal error blocks the command rather than
@@ -162,6 +168,27 @@ def _check_dependency_change(command):
     return None
 
 
+_AWS_DESTRUCTIVE_PATTERNS = (
+    r"aws\s+ec2\s+terminate-instances\b",
+    r"aws\s+ec2\s+delete-security-group\b",
+    r"aws\s+ec2\s+delete-key-pair\b",
+    r"aws\s+s3\s+rb\b",
+    r"aws\s+s3\s+rm\b[^;&|]*--recursive\b",
+    r"aws\s+s3api\s+delete-bucket\b",
+    r"aws\s+cloudfront\s+delete-distribution\b",
+    r"aws\s+rds\s+delete-db-(instance|cluster)\b",
+)
+
+
+def _check_aws_destructive(command):
+    for pattern in _AWS_DESTRUCTIVE_PATTERNS:
+        m = re.search(pattern + r"[^;&|]*", command)
+        if m:
+            return _block("destructive-operation", m.group(0).strip(),
+                           extra="(AWS resource deletion — see .claude/agents/deploy.md)")
+    return None
+
+
 CHECKS = (
     _check_merge,
     _check_destructive,
@@ -169,6 +196,7 @@ CHECKS = (
     _check_force_push,
     _check_release,
     _check_dependency_change,
+    _check_aws_destructive,
 )
 
 

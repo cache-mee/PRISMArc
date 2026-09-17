@@ -37,6 +37,7 @@
 | APPOINTMEN-28 | 2.11 FR-11: Cancel a booking | feature/APPOINTMEN-28-211-fr-11-cancel-a-booking | sdlc-dev-workflow | Phase 6 — Code Review | new session: /sdlc-dev-workflow review APPOINTMEN-28 | `.orchestration/runs/APPOINTMEN-28/status.md` |
 | APPOINTMEN-42 | 4.6 FR-22: Owner/Admin cannot manage staff accounts | feature/APPOINTMEN-42-owner-admin-cannot-manage-staff-accounts | sdlc-dev-workflow | Phase 6 — Code Review (stopped) | user merging PR #48 manually | `.orchestration/runs/APPOINTMEN-42/status.md` |
 | APPOINTMEN-43 | 4.7 FR-23: Owner/Admin cannot override staff schedules | feature/APPOINTMEN-43-47-fr-23-owneradmin-cannot-override | sdlc-dev-workflow | Phase 3 — Implementation Plan | — | `.orchestration/runs/APPOINTMEN-43/status.md` |
+| APPOINTMEN-54 | Booking Agent conversational loop: AI-driven intent → availability → confirm → book | feature/APPOINTMEN-54-booking-agent-conversational-loop | sdlc-dev-workflow | Phase 4 — Code Implementation | — | `.orchestration/runs/APPOINTMEN-54/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
