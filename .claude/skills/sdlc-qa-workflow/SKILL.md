@@ -12,9 +12,32 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill is owned by QA — not t
 - `{project-root}` is the repository root.
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
+- `{run_record}` resolves to `{run_dir}/run-record.md`.
 - `{pr_url}` is the GitHub PR URL for this ticket.
 - Integration tests test **boundaries** — two or more real components working together. They do not mock everything; they mock only external services (third-party APIs, email, payments).
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
+
+---
+
+## Run Record (agent-metrics)
+
+Schema: `.orchestration/schemas/run-record.md`. Append to the existing `{run_record}` rather
+than creating a new file.
+
+- On activation, set `State: qa` in `{run_record}` (create the file per the schema only if it
+  genuinely does not exist yet — e.g. QA is on a different machine and this is the first
+  workflow to touch this ticket).
+- After **every** phase below completes, and after every gate reply, append one row: `Step` =
+  `[qa] Phase N — Name` (or `[qa] Gate N — Name`), `Owner` = `test`, or exactly `human` for a
+  gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` /
+  `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601.
+- On QA **PASS** (Phase 4), set `State: complete` — this is the row that closes the ticket's
+  whole SDLC journey across all three development-side workflows.
+- On QA **FAIL** (Phase 4), keep `State: qa` and set `Next:` to name the failing tests the
+  developer must fix; the next `sdlc-dev-workflow` (or direct fix) pass reopens this same
+  `{run_record}` rather than starting a new one.
+- Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
+  note it and continue.
 
 ---
 
