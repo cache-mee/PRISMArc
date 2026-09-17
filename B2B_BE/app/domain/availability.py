@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,6 +116,26 @@ def _is_blocked_at(rows: Sequence[Availability], instant: datetime) -> bool:
         return False
     latest = max(covering, key=lambda row: row.created_at)
     return latest.blocked
+
+
+async def is_staff_blocked_now(
+    db: AsyncSession, *, staff_id: int, now: datetime | None = None
+) -> bool:
+    """Whether staff_id is blocked right now (FR-19's Dashboard status pill).
+
+    A thin public wrapper: defaults ``now`` to ``datetime.now(UTC)``, fetches
+    that day's ``Availability`` rows via the existing
+    ``list_availability_for_staff_on_day``, and delegates to the existing
+    ``_is_blocked_at`` rule — so the Dashboard's status pill and FR-7's own
+    slot-search block resolution can never disagree (single source of truth,
+    not a second implementation of the same rule).
+    """
+    if now is None:
+        now = datetime.now(UTC)
+    rows = await list_availability_for_staff_on_day(
+        db, staff_id=staff_id, day=now.date()
+    )
+    return _is_blocked_at(rows, now)
 
 
 class OpenSlot(BaseModel):
