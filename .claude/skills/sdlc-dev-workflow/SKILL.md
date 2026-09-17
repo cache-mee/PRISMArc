@@ -22,6 +22,17 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 
 ---
 
+## Token Efficiency (optional)
+
+The user may invoke `/caveman` (`.claude/skills/caveman/SKILL.md`) at any point to reduce
+conversational token spend during long phases — most useful in Phase 4 (Code Implementation)
+and Phase 6 (Code Review), which read a lot of code and diff output. It only changes how the
+agent talks; it never applies to persisted artefacts (`{plan_file}`, `{review_file}`, commit
+messages, PR bodies, Jira comments, `{run_record}` rows) and it auto-drops for gate prompts and
+irreversible-action confirmations, so it never makes a human gate ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`.

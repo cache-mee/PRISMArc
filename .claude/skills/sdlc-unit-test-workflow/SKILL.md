@@ -19,6 +19,16 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 
 ---
 
+## Token Efficiency (optional)
+
+The user may invoke `/caveman` (`.claude/skills/caveman/SKILL.md`) at any point to reduce
+conversational token spend while reading implemented code and writing tests. It only changes
+how the agent talks; it never applies to persisted artefacts (the test plan, test files,
+`{run_record}` rows) and it auto-drops for gate prompts and irreversible-action confirmations,
+so it never makes a human gate ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`. Append to the existing `{run_record}` rather

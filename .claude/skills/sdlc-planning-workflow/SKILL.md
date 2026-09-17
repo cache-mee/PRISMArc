@@ -22,6 +22,16 @@ for it. Human gates are stops, not suggestions.
 
 ---
 
+## Token Efficiency (optional)
+
+The user may invoke `/caveman` (`.claude/skills/caveman/SKILL.md`) at any point to reduce
+conversational token spend during long phases. It only changes how the agent talks; it never
+applies to persisted artefacts (the brief, PRD, epics/stories, `{run_record}` rows) and it
+auto-drops for gate prompts and irreversible-action confirmations, so it never makes a human
+gate ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`. This record is project-scoped, not
