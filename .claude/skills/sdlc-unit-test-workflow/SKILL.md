@@ -12,9 +12,27 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 - `{project-root}` is the repository root.
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
+- `{run_record}` resolves to `{run_dir}/run-record.md`.
 - Tests are written **after** implementation — this workflow reads existing code and writes tests for it.
 - A **human gate** means: stop, present the artefact, wait for explicit approval before proceeding.
 - **Bounded recovery:** each phase gets one retry on failure before escalating.
+
+---
+
+## Run Record (agent-metrics)
+
+Schema: `.orchestration/schemas/run-record.md`. Append to the existing `{run_record}` rather
+than creating a new file.
+
+- On activation, set `State: unit-testing` in `{run_record}` (create the file per the schema
+  only if it genuinely does not exist yet — e.g. this workflow was invoked standalone).
+- After **every** phase below completes, and after every gate reply, append one row: `Step` =
+  `[unit-test] Phase N — Name` (or `[unit-test] Gate N — Name`), `Owner` = `test`, or exactly
+  `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` =
+  `commit:<sha>` / `exit:<code>:<test-cmd>` / `approved`, `At` = now, ISO-8601.
+- Do not advance `State` past `unit-testing` — `sdlc-qa-workflow` is what moves it to `qa`.
+- Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
+  note it and continue.
 
 ---
 

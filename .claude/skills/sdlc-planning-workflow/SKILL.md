@@ -14,9 +14,34 @@ for it. Human gates are stops, not suggestions.
 - `{project-root}` is the repository root.
 - `{planning_artifacts}` resolves to `bmad-output/planning-artifacts`.
 - `{stack_root}` resolves to `{project-root}/stack`.
+- `{run_id}` resolves to `planning-{project_name}`.
+- `{run_record}` resolves to `.orchestration/runs/{run_id}/run-record.md`.
 - A **human gate** means: stop, present the artefact, wait for explicit user approval before continuing. Never reinterpret a gate as optional.
 - **Evidence, not claims.** Each phase must produce a file on disk before the gate is presented. A claim that an artefact exists is not evidence.
 - **Bounded recovery.** Each phase gets one retry on failure before escalating to the user.
+
+---
+
+## Run Record (agent-metrics)
+
+Schema: `.orchestration/schemas/run-record.md`. This record is project-scoped, not
+ticket-scoped, since planning runs before any ticket exists.
+
+- On first use, create `{run_record}` with `Issue: {project_name}`, `State: planning`.
+- After **every** phase below completes, and after every gate reply (`approved` / `revise` /
+  `stop`), append one row: `Step` = `[planning] Phase N — Name` (or `[planning] Gate N —
+  Name`), `Owner` = `business-analyst` / `product-manager` / `architect` / `ux-designer` for a
+  phase, or exactly `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`,
+  `Evidence` = the artefact path just produced (or `approved` / `revise` for a gate), `At` =
+  now, ISO-8601.
+- When Phase 7 (or the last enabled phase) completes, set `State: complete`. On a `stop` reply
+  at any gate, set `State: stopped` instead.
+- When Phase 7 pushes tickets to Jira, record each created ticket key in that row's `Evidence`
+  field (e.g. `created:PROJ-42,PROJ-43`) — this is what lets a later ticket's own run-record
+  point back here via its `Task:` field.
+- Never let this slow down or gate the workflow itself — it is a durable side-effect, not a
+  decision point. If `{run_record}` cannot be written, note it and continue; do not stop the
+  workflow over a metrics file.
 
 ---
 
