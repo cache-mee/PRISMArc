@@ -22,6 +22,18 @@ for it. Human gates are stops, not suggestions.
 
 ---
 
+## Communication Style (automatic)
+
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces — status updates, phase
+narration — automatically, for the whole run. No `/caveman` command needed; do not wait for the
+user to ask. It never applies to persisted artefacts (the brief, PRD, epics/stories,
+`{run_record}` rows) and it auto-drops for gate prompts and irreversible-action confirmations,
+per that skill's own Boundaries and Auto-Clarity rules, so it never makes a human gate
+ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`. This record is project-scoped, not

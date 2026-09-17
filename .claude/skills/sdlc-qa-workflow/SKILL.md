@@ -19,6 +19,18 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill is owned by QA — not t
 
 ---
 
+## Communication Style (automatic)
+
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces — most valuable while
+reading the PR diff and running/interpreting integration tests — automatically, for the whole
+run. No `/caveman` command needed; do not wait for the user to ask. It never applies to
+persisted artefacts (the test plan, `{run_record}` rows, the Jira PASS/FAIL comment) and it
+auto-drops for gate prompts and irreversible-action confirmations, per that skill's own
+Boundaries and Auto-Clarity rules, so it never makes a human gate ambiguous.
+
+---
+
 ## Run Record (agent-metrics)
 
 Schema: `.orchestration/schemas/run-record.md`. Append to the existing `{run_record}` rather
