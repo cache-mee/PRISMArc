@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
-from app.api.services import router as services_router
+from app.config import settings
 
-app = FastAPI(title="AppointmentDOTCom Backend")
+app = FastAPI(title=settings.app_name)
 
-app.include_router(services_router)
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}

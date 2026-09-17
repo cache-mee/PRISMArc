@@ -10,17 +10,17 @@
 
 | Phase | Status | Artefact | Gate |
 |---|---|---|---|
-| 1 — Discovery & Brief | `pending` | | Brief Approval |
-| 2 — PRD | `pending` | | (inline) |
-| 3 — Tech Stack | `pending` | | Stack Approval |
-| 4 — UX Design | `pending` | | Design Approval |
-| 5 — Epics & Stories | `pending` | | — |
-| 6 — Confluence Push | `pending` | | Push Summary |
-| 7 — Jira Push | `pending` | | Push Summary |
+| 1 — Discovery & Brief | `done` | bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/brief.md | Brief Approval — approved |
+| 2 — PRD | `done` | bmad-output/planning-artifacts/prd/prd-salon-app-2026-09-17/prd.md (final) | (inline) — approved |
+| 3 — Tech Stack | `done` | stack/stack-proposal.md; locked: stack/rules/base-rules.md, client-rules.md | Stack Approval — approved |
+| 4 — UX Design | `done` | bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/{customer-booking-chat,staff-owner-manager-chat,owner-dashboard,whatsapp-deltas}.md | Design Approval — approved |
+| 5 — Epics & Stories | `done` | bmad-output/planning-artifacts/epics/epics-salon-app-2026-09-17.md (8 epics, 44 stories) | — |
+| 6 — Confluence Push | `done` | 8 pages in space AP: https://experionglobal.atlassian.net/wiki/spaces/AP | Push Summary — done |
+| 7 — Jira Push | `done` | APPOINTMEN-1..52 (8 epics, 44 stories): https://experionglobal.atlassian.net/jira/software/projects/APPOINTMEN/boards | Push Summary — done |
 
-**Planning status:** `not started`
-**Last updated by:** —
-**Resume command:** `/sdlc-planning-workflow`
+**Planning status:** `complete`
+**Last updated by:** sdlc-planning-workflow — see `.orchestration/runs/planning-salon-app/run-record.md`
+**Resume command:** `/sdlc-dev-workflow` (planning is done; pick the next ticket from the Jira board above)
 
 ---
 
@@ -32,13 +32,21 @@
 |---|---|---|---|---|---|---|
 | — | — | — | — | — | — | — |
 
+> Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
+> (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
+> table automatically — re-sync it by hand if the planning run record changes again.
+
 ---
 
 ## Completed Tickets
 
 | Ticket | Summary | Branch | PR | QA Verdict | Completed |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| APPOINTMEN-9 | 0.1 Backend project scaffolding | feature/APPOINTMEN-9-01-backend-project-scaffolding | [#12](https://github.com/cache-mee/PRISMArc/pull/12) — MERGED into develop (ee1722b) | PASS (1/1 passed, 1 skipped — Docker build/network check not validated, Docker unavailable) | 2026-09-17 |
+| APPOINTMEN-10 | 0.2 Frontend project scaffolding | feature/APPOINTMEN-10-02-frontend-project-scaffolding | [#13](https://github.com/cache-mee/PRISMArc/pull/13) — MERGED into develop (a356f67) | PASS (17/19, 2 not validated — Docker build unverified) | 2026-09-17 |
+| APPOINTMEN-11 | 0.3 Local orchestration via Docker Compose | feature/APPOINTMEN-11-local-orchestration-docker-compose | [#15](https://github.com/cache-mee/PRISMArc/pull/15) — OPEN, targets `develop`, not yet merged | SKIPPED — unit-test and QA workflows never run (explicit user override, time constraints); code review PASSED (0 CRITICAL/MAJOR); Jira moved straight to Ready for UAT (done-category) | 2026-09-17 |
+| APPOINTMEN-17 | 1.5 FR-24: Web Chat Staff identity resolution | feature/APPOINTMEN-17-staff-identity-resolution | [#17](https://github.com/cache-mee/PRISMArc/pull/17) — MERGED into develop (2f7eff6) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override, time constraints); no independent verification performed; Jira moved straight In Review → Ready for UAT (done-category) | 2026-09-17 |
+| APPOINTMEN-22 | 2.5 FR-6: Exact-time resolution — direct confirmation | feature/APPOINTMEN-22-exact-time-direct-confirm | [#19](https://github.com/cache-mee/PRISMArc/pull/19) — MERGED into develop (49cfcae) | SKIPPED — code review, unit-test, and QA workflows all skipped (explicit user override, time constraints); no independent verification performed; Jira moved straight In Review → Ready for UAT (done-category); developed in an isolated git worktree | 2026-09-17 |
 
 ---
 
@@ -67,4 +75,4 @@
 
 ---
 
-*Last updated: {YYYY-MM-DD} by {workflow name}*
+*Last updated: 2026-09-17 by sdlc-dev-workflow (APPOINTMEN-11 — completed without unit-test/QA workflows, explicit user override)*

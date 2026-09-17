@@ -226,6 +226,26 @@ planning_artifacts: "bmad-output/planning-artifacts"
 
 ---
 
+### Step 6 — Agent-cost telemetry (automatic, local-only)
+
+This repo's `.claude/settings.json` enables Claude Code's OpenTelemetry export
+(`CLAUDE_CODE_ENABLE_TELEMETRY=1`, pointed at `http://127.0.0.1:4318`) for every session
+opened in this project, and a `SessionStart` hook auto-launches a small local collector
+(`tools/agent-metrics/otel-persistent-collector.py`) the first time it's needed. No setup
+required — it starts itself.
+
+What this means for you:
+- Cost/token data for your sessions in this repo (including per-agent breakdown — Developer,
+  Reviewer, Test, etc.) is logged to `~/.claude/metrics/otel-sessions.jsonl` **on your own
+  machine only**. Nothing is sent anywhere else.
+- Read it back any time: `python tools/agent-metrics/otel-persistent-collector.py report --by agent`
+- This is separate from `tools/agent-metrics/` itself (the `metrics run`/`report` tool), which
+  covers commands you explicitly wrap — see `tools/agent-metrics/README.md`.
+- To opt out, delete the `env` block and the `SessionStart` hook from `.claude/settings.json`,
+  or add an override in your own `.claude/settings.local.json`.
+
+---
+
 ## Role Setup at a Glance
 
 | Role | Additional setup | Primary commands |
