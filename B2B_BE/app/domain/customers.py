@@ -1,10 +1,12 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.customer import Customer
 from app.repositories.customers import create_customer, get_customer_by_phone
 
 
-def find_or_create_customer(db: Session, phone_number: str, name: str) -> Customer:
+async def find_or_create_customer(
+    db: AsyncSession, phone_number: str, name: str
+) -> Customer:
     """Look up a Customer by phone number, creating one if none exists.
 
     If a Customer already exists for ``phone_number``, it is returned
@@ -15,7 +17,7 @@ def find_or_create_customer(db: Session, phone_number: str, name: str) -> Custom
     This function is idempotent: calling it twice with the same
     ``phone_number`` never creates a duplicate Customer record.
     """
-    existing = get_customer_by_phone(db, phone_number)
+    existing = await get_customer_by_phone(db, phone_number)
     if existing is not None:
         return existing
-    return create_customer(db, phone_number, name)
+    return await create_customer(db, phone_number, name)
