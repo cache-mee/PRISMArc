@@ -1,8 +1,34 @@
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
+
+
+async def get_bookings_for_staff_in_window(
+    db: AsyncSession,
+    *,
+    staff_id: int,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[Booking]:
+    """Return staff_id's bookings whose start_time falls in [window_start, window_end).
+
+    Ordered by start_time. Used by the FR-26 conflict-check mechanism
+    (app.domain.conflicts.check_conflicts).
+    """
+    stmt = (
+        select(Booking)
+        .where(
+            Booking.staff_id == staff_id,
+            Booking.start_time >= window_start,
+            Booking.start_time < window_end,
+        )
+        .order_by(Booking.start_time)
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def create_booking(
@@ -13,10 +39,16 @@ async def create_booking(
     service_name: str,
     start_time: datetime,
     status: str = "confirmed",
+    commit: bool = True,
 ) -> Booking:
     """Insert a new Booking row and return it.
 
     This is the sole insert path for a Booking row in the codebase.
+
+    When ``commit`` is ``True`` (default), commits and refreshes the row
+    immediately — the exact prior behavior. When ``False``, only flushes
+    (still assigning the row's autoincrement ``id``), leaving the
+    transaction open for a caller composing multiple writes.
     """
     booking = Booking(
         customer_id=customer_id,
@@ -26,6 +58,57 @@ async def create_booking(
         status=status,
     )
     db.add(booking)
-    await db.commit()
-    await db.refresh(booking)
+    if commit:
+        await db.commit()
+        await db.refresh(booking)
+    else:
+        await db.flush()
     return booking
+
+
+async def get_booking_by_id(db: AsyncSession, booking_id: int) -> Booking | None:
+    """Return the Booking row matching booking_id, or None if not found."""
+    stmt = select(Booking).where(Booking.id == booking_id)
+    result = await db.execute(stmt)
+    return result.scalars().first()
+
+
+async def set_booking_status(
+    db: AsyncSession, booking: Booking, status: str, *, commit: bool = True
+) -> Booking:
+    """Set an already-fetched Booking's status field.
+
+    When ``commit`` is ``True`` (default), commits and refreshes the row
+    immediately. When ``False``, only flushes, leaving the transaction open
+    for a caller composing multiple writes.
+    """
+    booking.status = status
+    if commit:
+        await db.commit()
+        await db.refresh(booking)
+    else:
+        await db.flush()
+    return booking
+
+
+async def list_confirmed_bookings_for_staff_on_day(
+    db: AsyncSession, *, staff_id: int, day: date
+) -> list[Booking]:
+    """List a staff member's confirmed Bookings on ``day`` (FR-7 booked-slot exclusion).
+
+    Filters on ``status == "confirmed"`` and ``start_time`` falling within
+    ``day``. ``Booking`` has no ``end_time``, so this is exact-start-time
+    granularity only — the same single-time-field treatment already used
+    everywhere else in the codebase.
+    """
+    day_start = datetime.combine(day, time.min)
+    day_end = day_start + timedelta(days=1)
+    result = await db.execute(
+        select(Booking).where(
+            Booking.staff_id == staff_id,
+            Booking.status == "confirmed",
+            Booking.start_time >= day_start,
+            Booking.start_time < day_end,
+        )
+    )
+    return list(result.scalars().all())

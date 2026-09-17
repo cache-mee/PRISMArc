@@ -1,7 +1,9 @@
+import ChatWindow from "./chat/ChatWindow";
+
 function App() {
   return (
     <main>
-      <h1>Salon App</h1>
+      <ChatWindow />
     </main>
   );
 }
