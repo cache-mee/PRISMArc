@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.availability import is_staff_blocked_now
+from app.models.staff import StaffRole
 from app.repositories.bookings import (
     list_bookings_with_names_in_window,
     list_confirmed_bookings_for_staff_on_day,
@@ -15,9 +16,17 @@ DashboardView = Literal["today", "week"]
 
 
 class DashboardStaffStatus(BaseModel):
-    """FR-19's Dashboard staff-list card: one row per staff member."""
+    """FR-19's Dashboard staff-list card: one row per staff member.
 
+    ``staff_id``/``role`` are carried alongside the live status fields so this
+    single endpoint covers both the roster (APPOINTMEN-56) and live-status
+    (APPOINTMEN-47) needs of the same card, rather than shipping two
+    overlapping ``/dashboard/staff`` shapes.
+    """
+
+    staff_id: int
     staff_name: str
+    role: StaffRole
     blocked: bool
     today_booking_count: int
 
@@ -51,7 +60,9 @@ async def get_dashboard_staff_status(db: AsyncSession) -> list[DashboardStaffSta
         )
         statuses.append(
             DashboardStaffStatus(
+                staff_id=staff.id,
                 staff_name=staff.name,
+                role=staff.role,
                 blocked=blocked,
                 today_booking_count=len(todays_bookings),
             )

@@ -1,3 +1,13 @@
+"""``GET /dashboard/*`` — read-only Dashboard endpoints (APPOINTMEN-47/56, FR-19/FR-20).
+
+Per `base-rules.md`'s router conventions (mirrors `app.api.services`): thin
+`APIRouter` handlers over `app.domain.dashboard`'s aggregation functions, which
+in turn reuse existing read-only repository/domain helpers. No mutation logic
+is introduced here. ``/staff`` covers both the roster (APPOINTMEN-56) and
+live-status (APPOINTMEN-47) needs of the same Dashboard card via one response
+shape, rather than shipping two overlapping endpoints.
+"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +27,8 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 async def get_staff_status(
     session: AsyncSession = Depends(get_db),
 ) -> list[DashboardStaffStatus]:
-    """FR-19: current status (blocked/available, today's booking count) of
-    every Dashboard-visible staff member."""
+    """FR-19: current roster and status (blocked/available, today's booking
+    count) of every Dashboard-visible staff member."""
     return await get_dashboard_staff_status(session)
 
 
