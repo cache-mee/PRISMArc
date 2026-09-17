@@ -4,7 +4,7 @@
 Issue:  APPOINTMEN-11
 Branch: feature/APPOINTMEN-11-local-orchestration-docker-compose
 State:  in-development
-Next:   Review FAILED — awaiting user decision (Docker evidence gap is the MAJOR finding)
+Next:   Review PASSED — awaiting user reply on next-stage Jira transition
 Task:   .orchestration/runs/planning-salon-app/run-record.md
 
 | # | Step | Owner | Outcome | Evidence | At |
@@ -28,3 +28,6 @@ Task:   .orchestration/runs/planning-salon-app/run-record.md
 | 17 | [dev] Push gate | human | done | approved:push | 2026-09-17T12:18:57+00:00 |
 | 18 | [dev] Phase 5 — Pull Request | lead | done | pr:https://github.com/cache-mee/PRISMArc/pull/15 (created manually, gh CLI unavailable) | 2026-09-17T12:32:10+00:00 |
 | 19 | [dev] Phase 6 — Code Review | reviewer | done | development/plans/APPOINTMEN-11-review.md (FAIL: 0 CRITICAL, 1 MAJOR, 3 MINOR, 1 NITPICK) | 2026-09-17T12:32:10+00:00 |
+| 20 | [dev] Phase 4 — Docker verification (Task 4, real environment) | lead | done | exit:0:docker compose up/down (backend healthy, frontend reached backend /health over compose network) | 2026-09-17T12:45:00+00:00 |
+| 21 | [dev] Fix — .gitignore trailing newline (nitpick) | lead | done | commit:c9a600e | 2026-09-17T12:45:30+00:00 |
+| 22 | [dev] Phase 6 — Code Review (re-review) | reviewer | done | development/plans/APPOINTMEN-11-review.md (PASS: 0 CRITICAL, 0 MAJOR, 2 MINOR, 0 NITPICK) | 2026-09-17T12:49:11+00:00 |

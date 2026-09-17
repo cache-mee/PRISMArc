@@ -7,8 +7,8 @@ PR:      https://github.com/cache-mee/PRISMArc/pull/15
 ## You Are Here
 Workflow: sdlc-dev-workflow
 Phase:    Phase 6 — Code Review
-Waiting:  user decision on review FAIL (MAJOR: no dynamic Docker evidence for AC 2/3/4)
-Next:     Fix findings + push + re-review, or user accepts risk and overrides
+Waiting:  user reply on next-stage Jira transition (never Done — QA hasn't run)
+Next:     On "yes", transition Jira to next in-progress status (e.g. Ready for QA)
 
 ## Phase Tracker
 
@@ -19,7 +19,7 @@ Next:     Fix findings + push + re-review, or user accepts risk and overrides
 [✓] Gate 3 — Plan Review
 [✓] Phase 4 — Code Implementation
 [✓] Phase 5 — Pull Request
-[✗] Phase 6 — Code Review (FAIL)
+[✓] Phase 6 — Code Review (PASS)
 
 ### sdlc-unit-test-workflow
 [ ] Phase 1 — Code Reconnaissance
@@ -37,7 +37,7 @@ Next:     Fix findings + push + re-review, or user accepts risk and overrides
 
 ## Artefacts
 implementation-plan   development/plans/APPOINTMEN-11-implementation-plan.md   [done]
-review                development/plans/APPOINTMEN-11-review.md   [FAIL]
+review                development/plans/APPOINTMEN-11-review.md   [PASS]
 
 ## Commits
 c4163dc   Sync PROJECT-STATUS.md: mark APPOINTMEN-9 PR #12 as merged into develop
@@ -45,14 +45,15 @@ e8db4c4   APPOINTMEN-11: initialize dev-workflow run tracking
 d388475   APPOINTMEN-11: add root .env.example and gitignore entry for shared RDS config
 94a5225   APPOINTMEN-11: add docker-compose.yml with backend service
 78cc3e3   APPOINTMEN-11: add frontend service to docker-compose.yml
+0542611   APPOINTMEN-11: update run tracking through PR raised and review FAIL
+c9a600e   APPOINTMEN-11: add trailing newline to .gitignore
 
 ## Jira Transitions
 Start Dev          →   In Development   [done]
 Ready for Review   →   In Review        [done]
 
 ## Issues & Blockers
-Phase 4   Docker/Compose CLI unavailable in execution environment   Task 4 integration check reported "not validated"; carried into Phase 6 review as the MAJOR finding (no dynamic evidence for AC 2/3/4)
-Phase 6   Review verdict FAIL   Awaiting user decision: obtain real docker-compose evidence in a Docker-capable environment and re-review, or explicitly accept the risk and override
+(resolved) Phase 4/6   Docker unavailable in original execution environment   Resolved: Docker Desktop installed, full compose up/down evidence captured 2026-09-17T12:45:00+00:00, re-review PASSED
 
 ## How to Resume
-Run: /sdlc-dev-workflow review APPOINTMEN-11 — after pushing fixes, or after the user decides how to handle the Docker-evidence gap.
+Ticket is at the review-passed gate. Reply to the "move to next in-progress Jira status" question, then next steps are sdlc-unit-test-workflow then sdlc-qa-workflow for APPOINTMEN-11.

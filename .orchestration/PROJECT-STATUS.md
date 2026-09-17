@@ -30,7 +30,7 @@
 
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
-| APPOINTMEN-11 | 0.3 Local orchestration via Docker Compose | feature/APPOINTMEN-11-local-orchestration-docker-compose | sdlc-dev-workflow | Phase 6 — Code Review (FAIL) | user decision on Docker-evidence gap | `.orchestration/runs/APPOINTMEN-11/status.md` |
+| APPOINTMEN-11 | 0.3 Local orchestration via Docker Compose | feature/APPOINTMEN-11-local-orchestration-docker-compose | sdlc-dev-workflow | Phase 6 — Code Review (PASS) | reply on next-stage Jira transition | `.orchestration/runs/APPOINTMEN-11/status.md` |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
