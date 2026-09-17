@@ -14,9 +14,32 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 - `{plans_dir}` resolves to `{project-root}/development/plans/`.
 - `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md`.
 - `{review_file}` resolves to `{plans_dir}/{ticket}-review.md`.
+- `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
+- `{run_record}` resolves to `{run_dir}/run-record.md`.
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
 - **Bounded recovery:** each phase gets one retry on failure before escalating to the user.
 - **Commits are granular:** commit after each completed task, not once at the end.
+
+---
+
+## Run Record (agent-metrics)
+
+Schema: `.orchestration/schemas/run-record.md`.
+
+- On first use, create `{run_record}` with `Issue: {ticket}`, `Branch: n/a` (until Phase 2),
+  `State: in-development`. If a planning-cycle run-record exists for this ticket's originating
+  epic (`.orchestration/runs/planning-*/run-record.md`, check its Evidence rows for
+  `created:{ticket}`), set `Task:` to that path.
+- After **every** phase below completes, and after every gate reply, append one row: `Step` =
+  `[dev] Phase N — Name` (or `[dev] Gate N — Name`), `Owner` = `lead` (Phases 1–2) /
+  `developer` (Phases 3–4) / `reviewer` (Phase 6), or exactly `human` for a gate reply,
+  `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` / `exit:<code>:<cmd>`
+  / `jira:transitioned` / `pr:<url>` / `approved` as applicable, `At` = now, ISO-8601.
+- `State` stays `in-development` throughout this workflow — the next workflow to touch
+  `{run_record}` (`sdlc-unit-test-workflow`) is what advances it. Set `State: stopped` if the
+  user replies `stop` at any gate.
+- Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
+  note it and continue.
 
 ---
 
