@@ -1,4 +1,5 @@
-from datetime import datetime
+from collections.abc import Sequence
+from datetime import date, datetime, time, timedelta
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,15 @@ from app.domain.appointments import StaffNotFoundError
 from app.models.availability import Availability
 from app.repositories.availability import create_availability
 from app.repositories.staff_repository import get_staff_by_name
+
+# FR-7 slot grid (Technical Context assumption #1): a fixed salon-operating-
+# hours window and slot granularity, since no working-hours/slot-duration
+# concept exists anywhere else in the data model yet. Module-level constants
+# rather than a config/env value or new DB entity — see the implementation
+# plan's Risks for the explicit flag on this assumption.
+_SALON_OPENING_TIME = time(9, 0)
+_SALON_CLOSING_TIME = time(18, 0)
+_SLOT_DURATION_MINUTES = 30
 
 
 class AvailabilityChangeNotConfirmedError(ValueError):
@@ -66,3 +76,38 @@ async def confirm_and_apply_availability_change(
         end_time=change.end_time,
         blocked=change.blocked,
     )
+
+
+def _generate_slot_grid(day: date) -> list[datetime]:
+    """Generate every slot-grid start time on ``day`` (FR-7).
+
+    One entry per ``_SLOT_DURATION_MINUTES`` boundary from
+    ``_SALON_OPENING_TIME`` up to, but never at or after,
+    ``_SALON_CLOSING_TIME`` — a pure, DB-independent function so the slot
+    grid itself can be exhaustively unit-tested.
+    """
+    slots: list[datetime] = []
+    step = timedelta(minutes=_SLOT_DURATION_MINUTES)
+    current = datetime.combine(day, _SALON_OPENING_TIME)
+    closing = datetime.combine(day, _SALON_CLOSING_TIME)
+    while current < closing:
+        slots.append(current)
+        current += step
+    return slots
+
+
+def _is_blocked_at(rows: Sequence[Availability], instant: datetime) -> bool:
+    """Resolve whether ``instant`` is blocked per the latest-created covering row.
+
+    A staff member is blocked at ``instant`` when the most-recently-created
+    ``Availability`` row whose ``[start_time, end_time)`` window covers
+    ``instant`` has ``blocked=True``. Rows that do not actually cover
+    ``instant`` are ignored. With no covering row at all, ``instant`` is
+    open by default (Technical Context assumption #2 — consistent with
+    UJ-4's "open by default until blocked" framing).
+    """
+    covering = [row for row in rows if row.start_time <= instant < row.end_time]
+    if not covering:
+        return False
+    latest = max(covering, key=lambda row: row.created_at)
+    return latest.blocked
