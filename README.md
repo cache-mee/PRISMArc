@@ -36,7 +36,7 @@
 
 ## What is PRISM?
 
-PRISM is a framework that embeds **purpose-built AI agents** directly into your SDLC. Instead of using AI as a chat assistant, PRISM assigns each role in your team — BA, PM, Architect, UX Designer, Developer, QA, Reviewer — a dedicated agent that knows its job, follows your coding rules, connects to your tools, and hands off cleanly to the next agent.
+PRISM is a framework that embeds **purpose-built AI agents** directly into your SDLC. Instead of using AI as a chat assistant, PRISM assigns each role in your team — BA, PM, Architect, UX Designer, Developer, QA, Reviewer — a dedicated agent that knows its job, follows your coding rules, connects to your tools, and hands off cleanly to the next agent. Two more agents work outside the fixed workflow pipeline: **Lead** coordinates complex, multi-agent work on demand, and **Security** runs independent, OWASP-aligned audits standalone or alongside Reviewer.
 
 The result: a team where AI handles the mechanical work of each role, while **humans stay in control through explicit approval gates at every phase boundary**.
 
@@ -58,13 +58,16 @@ The result: a team where AI handles the mechanical work of each role, while **hu
 ║   │ Idea → Jira     │  │  workflow     workflow     workflow  │   ║
 ║   └─────────────────┘  └─────────────────────────────────────┘   ║
 ║                                                                  ║
-║   ◈ LAYER 2 — AGENTS  (the role players, invoked per phase)      ║
+║   ◈ LAYER 2 — AGENTS  (the role players)                         ║
 ║   ┌──────────┐ ┌──────┐ ┌──────────┐ ┌──────┐ ┌──────────┐      ║
 ║   │Business  │ │Prod. │ │Architect │ │  UX  │ │Developer │      ║
 ║   │Analyst   │ │Mgr   │ │          │ │Design│ │          │      ║
 ║   └──────────┘ └──────┘ └──────────┘ └──────┘ └──────────┘      ║
 ║   ┌──────────┐ ┌──────────┐                                      ║
 ║   │  Test    │ │ Reviewer │                                      ║
+║   └──────────┘ └──────────┘                                      ║
+║   ┌──────────┐ ┌──────────┐   ↑ fixed workflow phases             ║
+║   │   Lead   │ │ Security │   ↓ invoked ad hoc, any time           ║
 ║   └──────────┘ └──────────┘                                      ║
 ║                                                                  ║
 ║   ◈ LAYER 3 — CAPABILITY SKILLS  (bounded capabilities each agent uses) ║
@@ -88,7 +91,7 @@ The result: a team where AI handles the mechanical work of each role, while **hu
 
 | Concept | What it means |
 |---|---|
-| **Agents = Role Players** | Each agent knows its domain and nothing else. The BA doesn't write code. The Developer doesn't design UX. Each agent reads the previous one's output as its input. |
+| **Agents = Role Players** | Each agent knows its domain and nothing else. The BA doesn't write code. The Developer doesn't design UX. Each agent reads the previous one's output as its input. Seven agents (BA, PM, Architect, UX Designer, Developer, Test, Reviewer) sit on the fixed workflow pipelines; Lead and Security are invoked ad hoc, outside any one phase. |
 | **Skills = Two Kinds** | **Capability skills** are a single, reusable capability an agent invokes for one job — writing a brief, designing tests, implementing a task — and never decide what runs next. **Workflow skills** (Layer 1: `sdlc-*-workflow`) are the one named exception — each owns the fixed phase sequence of its own SDLC workflow and invokes the applicable agent per phase. |
 | **Gates = Human Control Points** | Every workflow stops at a gate and waits for your explicit reply before proceeding. Gates are never optional. This is how humans stay in control. |
 
@@ -378,6 +381,7 @@ PRISM maintains three files to track workflow state efficiently:
 salon-app/
 ├── .claude/
 │   ├── agents/              — Role agents (BA, PM, Architect, UX, Developer, Reviewer, QA)
+│   │                           + Lead (ad-hoc coordination), Security (OWASP audits)
 │   ├── skills/              — Workflow skills (sdlc-*-workflow, own phase sequencing)
 │   │                           + capability skills (bmad-*, code-review, ...)
 │   └── STANDARDS.md         — Normative operating rules (MUST / MUST NOT)
