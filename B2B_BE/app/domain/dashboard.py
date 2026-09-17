@@ -70,7 +70,9 @@ async def get_dashboard_staff_status(db: AsyncSession) -> list[DashboardStaffSta
     return statuses
 
 
-def _window_for_view(view: DashboardView, *, now: datetime) -> tuple[datetime, datetime]:
+def _window_for_view(
+    view: DashboardView, *, now: datetime
+) -> tuple[datetime, datetime]:
     """Resolve the [window_start, window_end) pair for a Dashboard bookings view.
 
     ``"today"`` is midnight-to-midnight UTC, matching the existing

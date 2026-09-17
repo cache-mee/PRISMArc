@@ -133,6 +133,7 @@ _ROLE_GREETINGS: dict[StaffRole, str] = {
     StaffRole.STAFF: "Hi {name}! Want to update your availability?",
 }
 
+
 class SpeakerContext(BaseModel):
     """The unambiguous "who is speaking" result for a resolved phone number."""
 
@@ -210,7 +211,9 @@ async def resolve_and_greet_speaker(
     state = session_store.get_or_create(session_id)
 
     if state.manager_resolved:
-        speaker = SpeakerContext(id=state.staff_id, name=state.staff_name, role=state.staff_role)
+        speaker = SpeakerContext(
+            id=state.staff_id, name=state.staff_name, role=state.staff_role
+        )
         return await run_manager_turn(
             db=db, session_id=session_id, speaker=speaker, message=message
         )
@@ -340,8 +343,7 @@ def render_proposed_availability_change_restatement(
             "Shall I confirm this?"
         )
     return (
-        f"You're unblocking {window} for {change.staff_name}. "
-        "Shall I confirm this?"
+        f"You're unblocking {window} for {change.staff_name}. " "Shall I confirm this?"
     )
 
 
@@ -395,7 +397,9 @@ def present_proposed_availability_change_for_confirmation(
     return render_proposed_availability_change_restatement(change)
 
 
-async def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
+async def handle_staff_catalog_boundary(
+    speaker: SpeakerContext, message: str
+) -> str | None:
     """Redirect a Staff-identified speaker away from an Owner/Admin-only catalog change (FR-28).
 
     This is the hook point a future conversational Manager Agent loop calls once a phone
@@ -473,9 +477,7 @@ _TOOL_LOOP_CAP_REACHED_MESSAGE = (
 message, in place of ever hanging the turn or raising.
 """
 
-_EMPTY_REPLY_FALLBACK = (
-    "I don't have anything further to add on that — is there anything else I can help with?"
-)
+_EMPTY_REPLY_FALLBACK = "I don't have anything further to add on that — is there anything else I can help with?"
 """Returned by ``run_manager_turn`` when the model stops calling tools but its
 final response has no text (``response.text`` is ``None``/empty), so a turn
 never returns an empty string to the speaker.
@@ -509,7 +511,9 @@ async def dispatch_tool(
 
     for tool in get_tools_for_role(speaker.role):
         if tool.name == name:
-            return await tool.dispatch(db=db, session_id=session_id, speaker=speaker, args=args)
+            return await tool.dispatch(
+                db=db, session_id=session_id, speaker=speaker, args=args
+            )
     return {
         "error": "tool_not_available",
         "message": f"Tool {name!r} is not available for this role.",
@@ -563,7 +567,9 @@ async def run_manager_turn(
     tools = [tool.schema for tool in get_tools_for_role(speaker.role)]
 
     for _ in range(_MAX_TOOL_ITERATIONS):
-        response = await provider.generate(system=system, messages=messages, tools=tools)
+        response = await provider.generate(
+            system=system, messages=messages, tools=tools
+        )
         messages.append(response.raw_message)
         if not response.tool_calls:
             break
