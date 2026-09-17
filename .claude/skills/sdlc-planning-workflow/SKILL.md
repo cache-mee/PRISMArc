@@ -611,6 +611,14 @@ last_completed_phase: 0
 
 ## Stop Conditions (Any Phase)
 
+Bounded recovery in this workflow follows the same `status.json` + `tools/breaker-check`
+convention defined in `sdlc-dev-workflow`'s "Bounded Recovery" section: on any retry, run
+`tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} --activity <key> --reason
+"<why>" --failure-signal "<signature>" --evidence "<path>"` (never hand-edit `status.json`), then
+run `tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}` before proceeding; a
+non-zero exit stops the retry. (`{run_dir}` here resolves to `.orchestration/runs/{run_id}/`, per
+this file's own conventions above.)
+
 - The user replies `stop` at any gate.
 - A source artefact required by the current phase does not exist on disk.
 - The current agent exhausts its retry limit without producing output.

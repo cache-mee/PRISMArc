@@ -23,6 +23,29 @@ APPOINTMEN-41 (FR-21, Owner/Admin cannot manage own availability) adds
 ``app.domain.owner_admin_availability_boundary.decline_owner_admin_own_availability_request``
 for an already-resolved speaker, ahead of ``build_proposed_availability_change`` /
 ``confirm_and_apply_availability_change`` ever running for that speaker.
+
+APPOINTMEN-49 (FR-14/FR-24, WhatsApp Staff/Owner identity resolution) adds
+``resolve_and_greet_speaker`` — the WhatsApp-channel counterpart to
+``app.agent.booking_agent.handle_message``'s customer-identity gate. It is the
+one new piece of dispatch logic the WhatsApp webhook adapter
+(``app.api.webhooks.whatsapp``) calls ahead of the customer flow: on a
+not-yet-resolved session it calls ``resolve_speaker``/``render_identity_greeting``
+(both unchanged, reused verbatim) and marks the session Staff/Owner-resolved on
+a match; on an already-resolved session it returns a short placeholder instead
+of re-resolving, mirroring ``booking_agent``'s ``_ALREADY_RESOLVED_PLACEHOLDER``
+pattern.
+
+APPOINTMEN-51 (WhatsApp channel-parity NFR, ``whatsapp-deltas.md`` §2) rewords
+``render_proposed_service_change_restatement``'s closing question (stories
+4.1-4.3) from the open-ended "Shall I confirm this?" to an explicit yes/no
+("Reply YES to confirm or NO to cancel."), mirroring APPOINTMEN-50's fix to
+``app.domain.appointments.render_direct_confirmation``.
+
+APPOINTMEN-51 also adds ``render_proposed_availability_change_restatement`` /
+``present_proposed_availability_change_for_confirmation`` (story 3.4, FR-27) —
+the restatement/confirmation-prompt hook point APPOINTMEN-33 explicitly
+deferred and no later ticket built, mirroring the existing catalog restatement
+hook pair's shape exactly.
 """
 
 import logging
@@ -32,6 +55,7 @@ from pydantic import BaseModel
 
 from app.agent.availability_intent import parse_availability_change
 from app.agent.catalog_intent import is_catalog_change_request
+from app.agent.state import session_store
 from app.domain.availability import ProposedAvailabilityChange
 from app.domain.conflict_verification import VerifiedConflictCheck
 from app.domain.conflicts import ConflictCheckResult
@@ -63,6 +87,8 @@ _ROLE_GREETINGS: dict[StaffRole, str] = {
     StaffRole.OWNER_ADMIN: "Hi {name}! Want to update the service catalog?",
     StaffRole.STAFF: "Hi {name}! Want to update your availability?",
 }
+
+_ALREADY_GREETED_PLACEHOLDER = "Got it — what would you like to do?"
 
 
 class SpeakerContext(BaseModel):
@@ -107,7 +133,44 @@ def render_identity_greeting(context: SpeakerContext) -> str:
     return template.format(name=context.name)
 
 
-def build_proposed_availability_change(
+async def resolve_and_greet_speaker(session_id: str, phone_number: str) -> str | None:
+    """Run one WhatsApp Staff/Owner identity-resolution turn for ``session_id`` (FR-14/FR-24).
+
+    This is the WhatsApp-channel counterpart to
+    ``app.agent.booking_agent.handle_message``'s customer-identity gate,
+    called by the WhatsApp webhook adapter ahead of the customer flow:
+
+    - Once the session is ``manager_resolved``, ``resolve_speaker`` is never
+      called again — this returns ``_ALREADY_GREETED_PLACEHOLDER`` instead,
+      which is what keeps every turn after the first from re-resolving
+      identity or ever falling through to the customer flow.
+    - Otherwise, ``resolve_speaker(phone_number)`` (unchanged) is called. No
+      match returns ``None`` — the caller is expected to fall through to the
+      customer flow. A match sets ``staff_id``/``staff_name``/``staff_role``/
+      ``phone_number``/``manager_resolved`` on the session state, saves it,
+      and returns ``render_identity_greeting(context)`` (unchanged, reused
+      verbatim) — the AC's "first message is directly the role-based
+      greeting."
+    """
+    state = session_store.get_or_create(session_id)
+
+    if state.manager_resolved:
+        return _ALREADY_GREETED_PLACEHOLDER
+
+    context = await resolve_speaker(phone_number)
+    if context is None:
+        return None
+
+    state.phone_number = phone_number
+    state.staff_id = context.id
+    state.staff_name = context.name
+    state.staff_role = context.role
+    state.manager_resolved = True
+    session_store.save(session_id, state)
+    return render_identity_greeting(context)
+
+
+async def build_proposed_availability_change(
     speaker: SpeakerContext,
     message: str,
     *,
@@ -126,7 +189,7 @@ def build_proposed_availability_change(
     ``parse_availability_change``: restating the change back to the staff member for
     explicit confirmation is Story 3.3, not built here.
     """
-    return parse_availability_change(message, staff_name=speaker.name, now=now)
+    return await parse_availability_change(message, staff_name=speaker.name, now=now)
 
 
 def present_conflict_check_for_verification(
@@ -165,14 +228,17 @@ def render_proposed_service_change_restatement(
     its own "at least one of new_name/new_price" shape); ``ProposedServiceDeletion``
     restates the ``service_id`` being removed, since that is all the type carries —
     resolving it to a service name would require a DB lookup, out of scope here (see
-    the APPOINTMEN-40 plan's Risks). Every branch ends in an explicit ask for
-    confirmation. Pure function, no I/O, no DB access — matches the style of this
-    module's ``render_identity_greeting``/``describe_speaker``.
+    the APPOINTMEN-40 plan's Risks). Every branch ends with an explicit yes/no
+    framing ("Reply YES to confirm or NO to cancel."), per ``whatsapp-deltas.md``
+    §2 (APPOINTMEN-51) — the same fix APPOINTMEN-50 applied to
+    ``render_direct_confirmation``. This is a shared, channel-agnostic renderer
+    with no ``channel`` parameter. Pure function, no I/O, no DB access — matches
+    the style of this module's ``render_identity_greeting``/``describe_speaker``.
     """
     if isinstance(proposed, ProposedService):
         return (
             f"You're adding a new service: {proposed.name!r} at "
-            f"{proposed.price!r}. Shall I confirm this?"
+            f"{proposed.price!r}. Reply YES to confirm or NO to cancel."
         )
     if isinstance(proposed, ProposedServiceEdit):
         changes = []
@@ -183,11 +249,11 @@ def render_proposed_service_change_restatement(
         change_text = " and ".join(changes)
         return (
             f"You're editing service {proposed.service_id!r}: changing "
-            f"{change_text}. Shall I confirm this?"
+            f"{change_text}. Reply YES to confirm or NO to cancel."
         )
     return (
         f"You're removing service {proposed.service_id!r} from the catalog. "
-        "Shall I confirm this?"
+        "Reply YES to confirm or NO to cancel."
     )
 
 
@@ -214,7 +280,70 @@ def present_proposed_service_change_for_confirmation(
     return render_proposed_service_change_restatement(proposed)
 
 
-def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
+def render_proposed_availability_change_restatement(
+    change: ProposedAvailabilityChange,
+) -> str:
+    """Render the human-readable restatement of a pending block/unblock change (FR-27).
+
+    Mirrors ``render_proposed_service_change_restatement``'s existing shape (pure
+    function, no I/O, no DB access) but dispatches on ``change.blocked`` rather
+    than an ``isinstance`` check, since both branches share a single
+    ``ProposedAvailabilityChange`` type. Restates the window being changed —
+    ``change.staff_name`` is always the speaker themselves (per
+    ``build_proposed_availability_change``), so both branches address them
+    directly as "you", matching ``staff-owner-manager-chat.md`` §3.1/§3.3's
+    wording. Fills the gap APPOINTMEN-33 explicitly deferred ("the agent
+    restates the change and asks for confirmation") and no later ticket built.
+    Both branches end with the explicit yes/no framing ("Reply YES to confirm
+    or NO to cancel.") per ``whatsapp-deltas.md`` §2, rather than the Web Chat
+    spec's "Confirm?" — the single shared, channel-agnostic string adopted by
+    APPOINTMEN-51 since no live turn loop exists yet to have already shipped
+    the "Confirm?" wording.
+    """
+    formatted_day = change.start_time.strftime("%A")
+    formatted_start = change.start_time.strftime("%I:%M %p")
+    formatted_end = change.end_time.strftime("%I:%M %p")
+    if change.blocked:
+        return (
+            f"Got it — I'll mark you unavailable {formatted_day} "
+            f"{formatted_start}–{formatted_end}. Reply YES to confirm "
+            "or NO to cancel."
+        )
+    return (
+        f"Got it — I'll reopen your schedule {formatted_day} "
+        f"{formatted_start}–{formatted_end}. Reply YES to confirm "
+        "or NO to cancel."
+    )
+
+
+def present_proposed_availability_change_for_confirmation(
+    change: ProposedAvailabilityChange,
+) -> str:
+    """Surface a freshly-restated availability change for the FR-27 checkpoint.
+
+    Mirrors ``present_proposed_service_change_for_confirmation``'s existing shape
+    exactly: this is the hook point a future conversational Manager Agent loop
+    will call immediately after a ``ProposedAvailabilityChange`` has been built
+    (e.g. from ``build_proposed_availability_change``), before any call to
+    ``confirm_and_apply_availability_change`` (``app.domain.availability``). It
+    logs the restated proposal as the observable checkpoint moment and returns
+    the restatement text from ``render_proposed_availability_change_restatement``
+    for a future conversational loop to send to the staff member, whose explicit
+    yes/no is then recorded (setting ``confirmed=True``) before
+    ``confirm_and_apply_availability_change`` will let the write through. This
+    is a new, still-unwired hook point — consistent with every other function in
+    this module — not a call-site wiring change; no endpoint or webhook file is
+    touched.
+    """
+    _logger.info(
+        "FR-27 checkpoint - proposed availability change awaiting human "
+        "confirmation: %r",
+        change,
+    )
+    return render_proposed_availability_change_restatement(change)
+
+
+async def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
     """Redirect a Staff-identified speaker away from an Owner/Admin-only catalog change (FR-28).
 
     This is the hook point a future conversational Manager Agent loop calls once a phone
@@ -231,7 +360,7 @@ def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str 
     same reasoning already applied to keeping identity/content out of free text elsewhere in this
     module.
     """
-    if speaker.role is StaffRole.STAFF and is_catalog_change_request(message):
+    if speaker.role is StaffRole.STAFF and await is_catalog_change_request(message):
         return _STAFF_CATALOG_BOUNDARY_REDIRECT
     return None
 

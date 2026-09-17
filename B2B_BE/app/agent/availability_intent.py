@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
-import anthropic
 from pydantic import BaseModel, Field
 
+from app.agent.providers.litellm_provider import LiteLLMProvider
 from app.config import settings
 from app.domain.availability import ProposedAvailabilityChange
 
@@ -43,15 +43,28 @@ class _ExtractedAvailabilityWindow(BaseModel):
     )
 
 
+class NoToolCallReturnedError(RuntimeError):
+    """Raised when the LLM response contains no tool call.
+
+    ``parse_availability_change`` genuinely requires a tool call to produce a
+    ``ProposedAvailabilityChange``; this judgment belongs here, not in ``LiteLLMProvider``
+    (which stays agnostic about whether an empty ``tool_calls`` list is an error for a
+    given caller).
+    """
+
+
 def _build_tool_schema() -> dict:
     return {
-        "name": _TOOL_NAME,
-        "description": "Record the staff member's parsed availability change.",
-        "input_schema": _ExtractedAvailabilityWindow.model_json_schema(),
+        "type": "function",
+        "function": {
+            "name": _TOOL_NAME,
+            "description": "Record the staff member's parsed availability change.",
+            "parameters": _ExtractedAvailabilityWindow.model_json_schema(),
+        },
     }
 
 
-def parse_availability_change(
+async def parse_availability_change(
     text: str,
     *,
     staff_name: str,
@@ -74,10 +87,8 @@ def parse_availability_change(
     not yet wired up by a real conversation loop.
     """
     reference_time = now or datetime.now(UTC)
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    response = client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=512,
+    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    response = await provider.generate(
         system=(
             "You extract a staff member's availability change (block or unblock) from their "
             f"free-text message. The current date/time is {reference_time.isoformat()}. "
@@ -90,11 +101,13 @@ def parse_availability_change(
         ),
         messages=[{"role": "user", "content": text}],
         tools=[_build_tool_schema()],
-        tool_choice={"type": "tool", "name": _TOOL_NAME},
     )
 
-    tool_use = next(block for block in response.content if block.type == "tool_use")
-    window = _ExtractedAvailabilityWindow.model_validate(tool_use.input)
+    if not response.tool_calls:
+        raise NoToolCallReturnedError(
+            f"LLM response contained no tool call for text: {text!r}"
+        )
+    window = _ExtractedAvailabilityWindow.model_validate(response.tool_calls[0].args)
 
     return ProposedAvailabilityChange(
         staff_name=staff_name,

@@ -52,7 +52,8 @@ Does not own:
 
 ## Outputs
 
-- Updated `status.json`: current agent, state, attempts, next action.
+- Updated `status.json`, written per `.orchestration/schemas/status.json` and checked via
+  `tools/breaker-check/breaker-check`: current agent, state, attempts, next action.
 - A handoff per delegation and at every stop.
 - Decision records in `decisions/` for delegation choices, scope decisions,
   conflict resolutions, recovery attempts and escalations.
@@ -75,6 +76,27 @@ under *Delegation mechanics* below, which MUST be stated explicitly when used.)
   *unvalidated*, not as pass.
 - Conflicts MUST be resolved on evidence — not on seniority, reporting order, or
   confidence of tone.
+
+## Bounded recovery mechanics
+
+This is the concrete mechanism behind the "A breaker in `breakers.json` trips" stop
+condition below.
+
+- Before granting any retry, and before continuing past any stop condition, the
+  Lead MUST first run `tools/breaker-check/breaker-check record-attempt --run-dir
+  .orchestration/runs/<WORK-ID>/ --activity <key> --reason "<why>" --failure-signal
+  "<signature>" --evidence "<path>"` (a key from `retry-limits.json`'s `limits`, e.g.
+  `implementation_fix`) — never hand-edit `status.json` directly; a malformed edit
+  would make every later `breaker-check` call fail with exit 2. This creates
+  `status.json` per `.orchestration/schemas/status.json` on first use and appends
+  to `attempts[]` on every call after.
+- The Lead MUST then run
+  `tools/breaker-check/breaker-check --run-dir .orchestration/runs/<WORK-ID>/ --ticket <WORK-ID>`.
+- Exit 0 means no breaker tripped: the Lead MAY proceed with the retry or the
+  continuation.
+- A non-zero exit means a breaker tripped: the Lead MUST stop and follow the
+  action `breaker-check` prints (escalate, request repair, etc.) rather than
+  overriding it or retrying anyway.
 
 ## Handoff expectations
 

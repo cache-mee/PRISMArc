@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "purpose": "Bounded recovery limits for agents working on salon-app. Read by agents; not enforced by any runtime. Changing a limit is a human decision.",
+  "purpose": "Bounded recovery limits for agents working on salon-app. Enforced by tools/breaker-check (attempt-limit / no-progress checks, evaluated against a run's status.json produced by `breaker-check record-attempt`). Changing a limit is a human decision.",
   "defaults": {
     "max_attempts": 3,
     "require_stated_reason": true,

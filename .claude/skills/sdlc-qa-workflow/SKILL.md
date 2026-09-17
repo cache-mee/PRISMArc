@@ -374,6 +374,13 @@ The developer must fix the failures and re-raise the PR. QA re-runs `/sdlc-qa-wo
 
 ## Stop Conditions
 
+Bounded recovery in this workflow follows the same `status.json` + `tools/breaker-check`
+convention defined in `sdlc-dev-workflow`'s "Bounded Recovery" section: on any retry, run
+`tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} --activity <key> --reason
+"<why>" --failure-signal "<signature>" --evidence "<path>"` (never hand-edit `status.json`), then
+run `tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}` before proceeding; a
+non-zero exit stops the retry.
+
 - QA replies `stop` at any gate.
 - PR diff cannot be fetched (ticket and PR URL not accessible).
 - Integration test infrastructure does not exist and QA does not want to set it up.

@@ -5,8 +5,24 @@ from app.models.service import Service
 
 
 async def list_services(session: AsyncSession) -> list[Service]:
+    """List every active Service row, ordered by name (FR-4/FR-31).
+
+    ``populate_existing=True`` forces this read to overwrite any
+    already-identity-mapped ``Service`` object in ``session`` with the row's
+    current column values, rather than SQLAlchemy's default of leaving an
+    already-loaded object's attributes untouched. Production request
+    handling already hands every call a fresh, per-request ``AsyncSession``
+    (``app.database.get_db``), so this is a no-op there — but it is what
+    keeps a confirmed price/name edit (``update_service``) visible on the
+    very next catalog read even for a caller that reuses one session across
+    multiple browse attempts (FR-31), instead of silently re-serving that
+    session's first-loaded, now-stale copy of the row.
+    """
     result = await session.execute(
-        select(Service).where(Service.is_active.is_(True)).order_by(Service.name)
+        select(Service)
+        .where(Service.is_active.is_(True))
+        .order_by(Service.name)
+        .execution_options(populate_existing=True)
     )
     return list(result.scalars().all())
 
