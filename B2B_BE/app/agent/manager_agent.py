@@ -20,6 +20,7 @@ from app.agent.availability_intent import parse_availability_change
 from app.agent.catalog_intent import is_catalog_change_request
 from app.domain.availability import ProposedAvailabilityChange
 from app.domain.dashboard_access import decline_staff_dashboard_request
+from app.domain.schedule_override import decline_staff_schedule_override
 from app.models.staff import StaffRole
 from app.tools.staff import resolve_staff_identity
 
@@ -134,3 +135,18 @@ def respond_to_dashboard_request(speaker: SpeakerContext) -> str | None:
     not ``None``; returns ``None`` when the request should proceed (Owner/Admin).
     """
     return decline_staff_dashboard_request(speaker.role)
+
+
+def respond_to_schedule_override_request(
+    speaker: SpeakerContext, change: ProposedAvailabilityChange
+) -> str | None:
+    """Consult the FR-30 guard for an already-resolved speaker and proposed change.
+
+    Hook point a future conversational Manager Agent loop calls once a
+    ``ProposedAvailabilityChange`` exists (e.g. from ``build_proposed_availability_change``),
+    before ever confirming or applying it. Returns the decline string to send back verbatim
+    when not ``None``; returns ``None`` when the change should proceed.
+    """
+    return decline_staff_schedule_override(
+        speaker.name, speaker.role, change.staff_name
+    )
