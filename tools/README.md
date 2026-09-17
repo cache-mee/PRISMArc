@@ -12,6 +12,7 @@ Shared deterministic tools for developing and maintaining **salon-app**.
 | `env-check/` | Reports whether an env var is `SET`/`EMPTY`/`UNSET` without ever printing its value | Pointed to by `.claude/hooks/secret-leak-guard.py`'s block message as the safe way to check a credential is configured |
 | `policy-guard/` | Mechanically enforces the backend/frontend scope boundary at write time — delegates to `scope-check`, extended to cover everything already touched in the working tree | Wired as a `PreToolUse` hook in `.claude/settings.json` for the `Write\|Edit` matcher |
 | `breaker-check/` | Evaluates `.orchestration/policy/breakers.json` / `retry-limits.json` (and, with `--ticket`, `budget-limits.json` against the `agent-metrics` ledger) against a run's `status.json`; `record-attempt` is the deterministic writer for that file's `attempts[]` | Called by `.claude/agents/lead.md` and all four `sdlc-*-workflow` skills' Bounded Recovery steps, before granting any retry |
+| `aws-deploy-check/` | Read-only `aws` CLI checks: account/region match, security-group port exposed to `0.0.0.0/0`/`::/0`, S3 public-access-block state, CloudFront origin OAC — never creates/modifies/destroys a resource | `.claude/agents/deploy.md`'s `aws` environment lifecycle (preflight/security-gate and post-deploy verification) |
 | `_lib/` | Shared helpers (git/path utilities, config-table parsing) used by `worktree-add`, `scope-check`, `env-check`, `policy-guard` and `breaker-check` | All of the above |
 
 Bash-command gates (`merge`, `push-to-shared-branch`, `destructive-operation`,
