@@ -125,6 +125,7 @@ Operating rules:
 | Normative AI-development rules | `.claude/STANDARDS.md` |
 | Agent contracts | `.claude/agents/` |
 | Skill contracts | `.claude/skills/<skill>/SKILL.md` |
+| Claude Code lifecycle hooks (e.g. secret-leak guard) | `.claude/hooks/`, wired in `.claude/settings.json` — see `.claude/hooks/README.md` |
 | Skill-specific scripts | `.claude/skills/<skill>/scripts/` (none yet) |
 | Shared deterministic tools | `tools/` (empty by design — see `tools/README.md`) |
 | Retry / breaker / gate policy | `.orchestration/policy/` |
