@@ -6,9 +6,9 @@ PR:      https://github.com/cache-mee/PRISMArc/pull/15
 
 ## You Are Here
 Workflow: sdlc-dev-workflow
-Phase:    Phase 6 — Code Review (PASS) — handed off
+Phase:    Complete — Jira at Done-category (Ready for UAT)
 Waiting:  n/a
-Next:     new session: /sdlc-unit-test-workflow APPOINTMEN-11, then /sdlc-qa-workflow APPOINTMEN-11
+Next:     Merge PR #15 into develop. No unit-test/QA workflow was run (explicit user override, time constraints).
 
 ## Phase Tracker
 
@@ -52,9 +52,12 @@ c9a600e   APPOINTMEN-11: add trailing newline to .gitignore
 Start Dev          →   In Development   [done]
 Ready for Review   →   In Review        [done]
 Ready for QA       →   In QA            [done]
+QA Done            →   QA Done          [done — no actual QA run, user override]
+QA Done            →   Ready for UAT    [done — statusCategory=done, no actual QA run, user override]
 
 ## Issues & Blockers
 (resolved) Phase 4/6   Docker unavailable in original execution environment   Resolved: Docker Desktop installed, full compose up/down evidence captured 2026-09-17T12:45:00+00:00, re-review PASSED
+(open, by design) Phase 7   No unit tests or QA integration tests were ever run for this ticket   Explicit user override due to time constraints; Jira transitioned straight to Done-category (Ready for UAT); disclosed in Jira comment 238182
 
 ## How to Resume
-sdlc-dev-workflow is complete for this ticket. New session: /sdlc-unit-test-workflow APPOINTMEN-11, then /sdlc-qa-workflow APPOINTMEN-11.
+Ticket is complete by explicit user decision. sdlc-unit-test-workflow and sdlc-qa-workflow were never run for APPOINTMEN-11 — if that coverage is wanted later, run them manually against this merged/mergeable branch.

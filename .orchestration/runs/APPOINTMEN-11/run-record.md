@@ -3,8 +3,8 @@
 
 Issue:  APPOINTMEN-11
 Branch: feature/APPOINTMEN-11-local-orchestration-docker-compose
-State:  in-development
-Next:   Handed off — run sdlc-unit-test-workflow then sdlc-qa-workflow for APPOINTMEN-11
+State:  complete
+Next:   None. Merge PR #15 into develop. UNVALIDATED: no unit tests, no QA integration pass — sdlc-unit-test-workflow and sdlc-qa-workflow were explicitly skipped by user request (time constraints); Jira transitioned straight to Done-category (Ready for UAT) without either running.
 Task:   .orchestration/runs/planning-salon-app/run-record.md
 
 | # | Step | Owner | Outcome | Evidence | At |
@@ -32,3 +32,4 @@ Task:   .orchestration/runs/planning-salon-app/run-record.md
 | 21 | [dev] Fix — .gitignore trailing newline (nitpick) | lead | done | commit:c9a600e | 2026-09-17T12:45:30+00:00 |
 | 22 | [dev] Phase 6 — Code Review (re-review) | reviewer | done | development/plans/APPOINTMEN-11-review.md (PASS: 0 CRITICAL, 0 MAJOR, 2 MINOR, 0 NITPICK) | 2026-09-17T12:49:11+00:00 |
 | 23 | [dev] Gate — Review Passed / Jira transition | human | done | jira:transitioned:In QA | 2026-09-17T12:50:50+00:00 |
+| 24 | [dev] User override — skip unit-test/QA workflows | human | done | jira:transitioned:QA Done; jira:transitioned:Ready for UAT (statusCategory=done); jira:commented (explicit disclosure - no QA/unit-test executed) | 2026-09-17T12:53:27+00:00 |

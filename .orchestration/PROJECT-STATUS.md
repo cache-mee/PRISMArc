@@ -30,7 +30,7 @@
 
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
-| APPOINTMEN-11 | 0.3 Local orchestration via Docker Compose | feature/APPOINTMEN-11-local-orchestration-docker-compose | sdlc-dev-workflow (complete, handed off) | Phase 6 — Code Review (PASS) | sdlc-unit-test-workflow / sdlc-qa-workflow | `.orchestration/runs/APPOINTMEN-11/status.md` |
+| — | — | — | — | — | — | — |
 
 > Note: the Planning Phase table above was synced from `.orchestration/runs/planning-salon-app/run-record.md`
 > (the authoritative planning run record) on 2026-09-17. `sdlc-planning-workflow` does not update this
@@ -44,6 +44,7 @@
 |---|---|---|---|---|---|
 | APPOINTMEN-9 | 0.1 Backend project scaffolding | feature/APPOINTMEN-9-01-backend-project-scaffolding | [#12](https://github.com/cache-mee/PRISMArc/pull/12) — MERGED into develop (ee1722b) | PASS (1/1 passed, 1 skipped — Docker build/network check not validated, Docker unavailable) | 2026-09-17 |
 | APPOINTMEN-10 | 0.2 Frontend project scaffolding | feature/APPOINTMEN-10-02-frontend-project-scaffolding | [#13](https://github.com/cache-mee/PRISMArc/pull/13) — MERGED into develop (a356f67) | PASS (17/19, 2 not validated — Docker build unverified) | 2026-09-17 |
+| APPOINTMEN-11 | 0.3 Local orchestration via Docker Compose | feature/APPOINTMEN-11-local-orchestration-docker-compose | [#15](https://github.com/cache-mee/PRISMArc/pull/15) — OPEN, targets `develop`, not yet merged | SKIPPED — unit-test and QA workflows never run (explicit user override, time constraints); code review PASSED (0 CRITICAL/MAJOR); Jira moved straight to Ready for UAT (done-category) | 2026-09-17 |
 
 ---
 
@@ -72,4 +73,4 @@
 
 ---
 
-*Last updated: 2026-09-17 by sdlc-qa-workflow (APPOINTMEN-9)*
+*Last updated: 2026-09-17 by sdlc-dev-workflow (APPOINTMEN-11 — completed without unit-test/QA workflows, explicit user override)*
