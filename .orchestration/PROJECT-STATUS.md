@@ -30,7 +30,7 @@
 
 | Ticket | Summary | Branch | Current Workflow | Phase | Waiting On | Status File |
 |---|---|---|---|---|---|---|
-| APPOINTMEN-14 | LLM provider integration via litellm (generic AI-provider handler) — Jira key reused ad hoc; actual ticket text unrelated & already Ready for UAT under a different branch | feature/APPOINTMEN-14-llm-provider-integration | sdlc-dev-workflow | Phase 6 handoff — PR [#59](https://github.com/cache-mee/PRISMArc/pull/59) raised | new session: /sdlc-dev-workflow review APPOINTMEN-14 | `.orchestration/runs/APPOINTMEN-14/status.md` |
+| APPOINTMEN-14 | LLM provider integration via litellm (generic AI-provider handler) — Jira key reused ad hoc; actual ticket text unrelated & already Ready for UAT under a different branch | feature/APPOINTMEN-14-llm-provider-integration | sdlc-dev-workflow | Gate 3 — Plan Review | user reply: implement / revise: <notes> / stop | `.orchestration/runs/APPOINTMEN-14/status.md` |
 | APPOINTMEN-16 | 1.4 FR-14: Web Chat Owner/Admin identity resolution | feature/APPOINTMEN-16-owner-admin-identity-resolution | sdlc-dev-workflow | Phase 6 — Code Review | new session: /sdlc-dev-workflow review APPOINTMEN-16 | `.orchestration/runs/APPOINTMEN-16/status.md` |
 | APPOINTMEN-20 | 2.3 FR-13: Staff preference limited to bookable staff | feature/APPOINTMEN-20-23-fr-13-staff-preference-limited-to | sdlc-dev-workflow | Phase 3 — Implementation Plan | — | `.orchestration/runs/APPOINTMEN-20/status.md` |
 | APPOINTMEN-25 | 2.8 SM-4b: Alternative-slot human-verification checkpoint | feature/APPOINTMEN-25-alternative-slot-human-verification | sdlc-dev-workflow | Phase 6 — Code Review | new session: /sdlc-dev-workflow review APPOINTMEN-25 | `.orchestration/runs/APPOINTMEN-25/status.md` |
