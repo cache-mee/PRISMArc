@@ -24,23 +24,37 @@ tickets:
   that the identity gate above runs first, every time, before that
   placeholder (or any future real intent handling) executes.
 
+- ``present_intent_for_verification`` — the SM-4a human-verification
+  checkpoint (APPOINTMEN-21) referenced by ``confirm_exact_match`` below.
+  Logs a freshly-parsed ``BookingIntent`` (``app.agent.booking_intent``) as
+  the observable checkpoint moment and returns it wrapped, unverified, in a
+  ``VerifiedBookingIntent``. Not customer-visible. A human operator reviews
+  or corrects it before ``app.domain.booking_intent_verification.require_verified_intent``
+  will let any downstream code act on it.
+
 - ``confirm_exact_match`` — FR-6's direct-confirmation prompt
   (APPOINTMEN-22). The hook point a future conversational Booking Agent
   loop will call once intent parsing, staff-preference limiting, the SM-4a
   checkpoint, and an actual availability check have all resolved to one
   candidate slot.
 
-These two pieces do not yet call each other — wiring the identity-resolved
-turn loop into intent parsing and booking confirmation is future,
-out-of-scope work (Epic 2/3).
+These three pieces do not yet call each other — wiring the identity-resolved
+turn loop into intent parsing, the SM-4a checkpoint, and booking confirmation
+is future, out-of-scope work (Epic 2/3).
 """
+
+import logging
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.booking_intent import BookingIntent
 from app.agent.state import session_store
 from app.domain.appointments import ResolvedBookingCandidate, render_direct_confirmation
+from app.domain.booking_intent_verification import VerifiedBookingIntent
 from app.domain.identity import resolve_customer_by_phone
+
+_logger = logging.getLogger(__name__)
 
 _ASK_PHONE_NUMBER = "Could I get your phone number to pull up your account?"
 _NEW_CUSTOMER_INTERIM = "I don't have that number on file yet — what's your name?"
@@ -97,6 +111,30 @@ async def handle_message(db: AsyncSession, session_id: str, message: str | None)
     session_store.save(session_id, state)
     hand_off_to_new_customer_flow(session_id, phone_number)
     return _NEW_CUSTOMER_INTERIM
+
+
+def present_intent_for_verification(intent: BookingIntent) -> VerifiedBookingIntent:
+    """Surface a freshly-parsed ``BookingIntent`` for the SM-4a checkpoint (APPOINTMEN-21).
+
+    This is the hook point a future conversational Booking Agent loop will
+    call immediately after ``parse_booking_intent``
+    (``app.agent.booking_intent``), before staff-preference limiting, an
+    actual availability check, or any Story 2.5/2.6/2.7 (FR-6/7/8)
+    resolution code runs. Not customer-visible — it logs the parsed intent
+    as the observable checkpoint moment and returns an unverified
+    ``VerifiedBookingIntent``; a human operator reviews or corrects it and
+    sets ``verified`` to ``True`` before
+    ``app.domain.booking_intent_verification.require_verified_intent`` will
+    let it through.
+    """
+    _logger.info(
+        "SM-4a checkpoint - parsed booking intent awaiting human verification: "
+        "service_name=%r requested_time=%r staff_preference=%r",
+        intent.service_name,
+        intent.requested_time,
+        intent.staff_preference,
+    )
+    return VerifiedBookingIntent(intent=intent)
 
 
 class DirectConfirmationPrompt(BaseModel):
