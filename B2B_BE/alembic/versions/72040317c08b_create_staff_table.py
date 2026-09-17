@@ -21,8 +21,11 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
+    # No explicit staff_role.create() here: the Enum column below already
+    # triggers CREATE TYPE automatically on table creation. Calling both
+    # raised psycopg.errors.DuplicateObject on a fresh database — checkfirst
+    # on the explicit call doesn't prevent the automatic one from also firing.
     staff_role = sa.Enum("owner_admin", "staff", name="staff_role")
-    staff_role.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "staff",
