@@ -43,6 +43,22 @@ async def get_booking_by_id(db: AsyncSession, booking_id: int) -> Booking | None
     return result.scalars().first()
 
 
+async def cancel_booking(db: AsyncSession, *, booking_id: int) -> Booking | None:
+    """Set status="cancelled" on the Booking matching booking_id and return it.
+
+    This is the sole status-transition write path for a Booking row,
+    mirroring how create_booking() is the sole insert path. Returns None
+    (no write attempted) if booking_id does not resolve to an existing row.
+    """
+    booking = await get_booking_by_id(db, booking_id)
+    if booking is None:
+        return None
+    booking.status = "cancelled"
+    await db.commit()
+    await db.refresh(booking)
+    return booking
+
+
 async def create_booking(
     db: AsyncSession,
     *,
