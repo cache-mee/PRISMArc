@@ -12,7 +12,7 @@ Context* decision 5, and *Risks*. This is expected to be replaced by
 ``messages`` table exists.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.models.staff import StaffRole
 
@@ -35,6 +35,11 @@ class SessionState:
     staff_name: str | None = None
     staff_role: StaffRole | None = None
     manager_resolved: bool = False
+
+    # Conversation history — additive only, added by APPOINTMEN-54 (Booking
+    # Agent conversational loop). Defaults to an empty list so every existing
+    # call site and behavior is unaffected.
+    history: list[dict] = field(default_factory=list)
 
 
 _sessions: dict[str, SessionState] = {}
