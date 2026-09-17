@@ -1,5 +1,9 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
+from app.agent.availability_intent import parse_availability_change
+from app.domain.availability import ProposedAvailabilityChange
 from app.models.staff import StaffRole
 from app.tools.staff import resolve_staff_identity
 
@@ -34,3 +38,25 @@ def describe_speaker(context: SpeakerContext) -> str:
     """Render an unambiguous statement of which Staff member is speaking."""
     role_label = _ROLE_LABELS[context.role]
     return f"Recognized as {context.name} ({role_label})."
+
+
+def build_proposed_availability_change(
+    speaker: SpeakerContext,
+    message: str,
+    *,
+    now: datetime | None = None,
+) -> ProposedAvailabilityChange:
+    """Turn a resolved Staff speaker's free-text message into a proposed change (FR-25).
+
+    This is the hook point a future conversational Manager Agent loop calls once a phone
+    number has already been resolved to a ``SpeakerContext`` (via ``resolve_speaker``) and
+    the message has been identified as a block/unblock request. ``speaker.name`` — never
+    anything parsed from ``message`` — is always the staff member the resulting
+    ``ProposedAvailabilityChange`` is attributed to, which is what keeps FR-30's "a staff
+    member cannot alter another staff member's schedule" boundary intact.
+
+    Returns the change with ``confirmed=False`` unchanged from
+    ``parse_availability_change``: restating the change back to the staff member for
+    explicit confirmation is Story 3.3, not built here.
+    """
+    return parse_availability_change(message, staff_name=speaker.name, now=now)
