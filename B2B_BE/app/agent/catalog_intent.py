@@ -1,6 +1,6 @@
-import anthropic
 from pydantic import BaseModel, Field
 
+from app.agent.providers.litellm_provider import LiteLLMProvider
 from app.config import settings
 
 _TOOL_NAME = "classify_catalog_change_request"
@@ -23,15 +23,27 @@ class _CatalogChangeClassification(BaseModel):
     )
 
 
+class NoToolCallReturnedError(RuntimeError):
+    """Raised when the LLM response contains no tool call.
+
+    ``is_catalog_change_request`` genuinely requires a tool call to produce a
+    classification; this judgment belongs here, not in ``LiteLLMProvider`` (which stays
+    agnostic about whether an empty ``tool_calls`` list is an error for a given caller).
+    """
+
+
 def _build_tool_schema() -> dict:
     return {
-        "name": _TOOL_NAME,
-        "description": "Record whether the message is a catalog add/edit/delete request.",
-        "input_schema": _CatalogChangeClassification.model_json_schema(),
+        "type": "function",
+        "function": {
+            "name": _TOOL_NAME,
+            "description": "Record whether the message is a catalog add/edit/delete request.",
+            "parameters": _CatalogChangeClassification.model_json_schema(),
+        },
     }
 
 
-def is_catalog_change_request(text: str) -> bool:
+async def is_catalog_change_request(text: str) -> bool:
     """Classify whether ``text`` is a request to add, edit, or delete a Service or its price
     (FR-28).
 
@@ -40,16 +52,14 @@ def is_catalog_change_request(text: str) -> bool:
     channel-specific branch and no identity awareness of its own — classification is purely over
     the message text, mirroring ``app.agent.booking_intent.parse_booking_intent`` and
     ``app.agent.availability_intent.parse_availability_change``'s shared pattern of a single
-    forced Anthropic tool call.
+    forced tool call through the provider abstraction.
 
     Deliberately does not fire on availability/schedule requests (e.g. "block out Friday
     morning", FR-25) or on browsing questions about existing prices/services — only on a request
     to change the catalog itself.
     """
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    response = client.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=64,
+    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    response = await provider.generate(
         system=(
             "You classify whether a message is a request to add, edit/change, or delete/remove "
             "a salon Service or its price — a catalog-write request. Positive examples: 'add "
@@ -61,10 +71,14 @@ def is_catalog_change_request(text: str) -> bool:
         ),
         messages=[{"role": "user", "content": text}],
         tools=[_build_tool_schema()],
-        tool_choice={"type": "tool", "name": _TOOL_NAME},
     )
 
-    tool_use = next(block for block in response.content if block.type == "tool_use")
-    classification = _CatalogChangeClassification.model_validate(tool_use.input)
+    if not response.tool_calls:
+        raise NoToolCallReturnedError(
+            f"LLM response contained no tool call for text: {text!r}"
+        )
+    classification = _CatalogChangeClassification.model_validate(
+        response.tool_calls[0].args
+    )
 
     return classification.is_catalog_change

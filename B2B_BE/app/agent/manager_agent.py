@@ -158,7 +158,7 @@ async def resolve_and_greet_speaker(session_id: str, phone_number: str) -> str |
     return render_identity_greeting(context)
 
 
-def build_proposed_availability_change(
+async def build_proposed_availability_change(
     speaker: SpeakerContext,
     message: str,
     *,
@@ -177,7 +177,7 @@ def build_proposed_availability_change(
     ``parse_availability_change``: restating the change back to the staff member for
     explicit confirmation is Story 3.3, not built here.
     """
-    return parse_availability_change(message, staff_name=speaker.name, now=now)
+    return await parse_availability_change(message, staff_name=speaker.name, now=now)
 
 
 def present_conflict_check_for_verification(
@@ -265,7 +265,7 @@ def present_proposed_service_change_for_confirmation(
     return render_proposed_service_change_restatement(proposed)
 
 
-def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
+async def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
     """Redirect a Staff-identified speaker away from an Owner/Admin-only catalog change (FR-28).
 
     This is the hook point a future conversational Manager Agent loop calls once a phone
@@ -282,7 +282,7 @@ def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str 
     same reasoning already applied to keeping identity/content out of free text elsewhere in this
     module.
     """
-    if speaker.role is StaffRole.STAFF and is_catalog_change_request(message):
+    if speaker.role is StaffRole.STAFF and await is_catalog_change_request(message):
         return _STAFF_CATALOG_BOUNDARY_REDIRECT
     return None
 

@@ -79,13 +79,16 @@ class ResolvedBookingCandidate(BaseModel):
 def render_direct_confirmation(candidate: ResolvedBookingCandidate) -> str:
     """Render the FR-6 direct-confirmation message for a resolved candidate.
 
-    Names the service, date/time, and assigned staff, and explicitly asks
-    the Customer to confirm before any Booking is created.
+    Names the service, date/time, and assigned staff, and asks the Customer
+    to confirm before any Booking is created via an explicit yes/no
+    question, per ``whatsapp-deltas.md`` §1's FR-9 example. This is a
+    shared, channel-agnostic renderer with no ``channel`` parameter, also
+    reused as the confirm-step prompt by ``reschedule_booking`` (FR-12).
     """
     formatted_time = candidate.start_time.strftime("%A, %B %d at %I:%M %p")
     return (
         f"I can book {candidate.service_name} with {candidate.staff_name} on "
-        f"{formatted_time}. Shall I go ahead and confirm this booking?"
+        f"{formatted_time} — reply YES to confirm or NO to change it."
     )
 
 
@@ -466,25 +469,18 @@ async def find_nearest_alternatives(
     )
 
 
-def _join_slot_phrases(phrases: list[str]) -> str:
-    """Join slot-time phrases with ", " and a final "or" — no trailing "or" for a single phrase."""
-    if len(phrases) == 1:
-        return phrases[0]
-    return ", ".join(phrases[:-1]) + " or " + phrases[-1]
-
-
 def render_alternative_slots(
     result: NearestAlternativesResult, service_name: str
 ) -> str:
     """Render the FR-8 nearest-alternative(s) message for a NearestAlternativesResult.
 
-    States the reason requested_time was unavailable, then names every
-    ``AlternativeSlot`` in ``result.alternatives`` (never just the first),
-    matching the UX spec's example phrasing ("...is already booked. She's
-    free at 1:00 PM or 2:30 PM Saturday — want one of these?"). Mirrors
-    ``render_direct_confirmation``'s and ``render_conflict_message``'s
-    existing plain, human-readable style — no chip/UI markup, which is
-    ``B2B_FE/`` scope.
+    States the reason requested_time was unavailable, then lists every
+    ``AlternativeSlot`` in ``result.alternatives`` (never just the first) as
+    a numbered plain-text list, per ``whatsapp-deltas.md`` §1's rule that
+    every FR-7/FR-8 choice point renders as a numbered list. Mirrors
+    ``render_direct_confirmation``'s existing plain, human-readable style —
+    no chip/UI markup, which is ``B2B_FE/`` scope. Shared, channel-agnostic
+    renderer with no ``channel`` parameter.
     """
     formatted_requested = result.requested_time.strftime("%A %I:%M %p")
     reason_text = (
@@ -497,21 +493,23 @@ def render_alternative_slots(
         unavailable_line = (
             f"{result.staff_name}'s {formatted_requested} is {reason_text}."
         )
-        slot_phrases = [
-            slot.start_time.strftime("%I:%M %p") for slot in result.alternatives
+        lead_line = f"{result.staff_name} is free at:"
+        slot_lines = [
+            f"{index}) {slot.start_time.strftime('%I:%M %p')}"
+            for index, slot in enumerate(result.alternatives, start=1)
         ]
-        free_line = f"{result.staff_name} is free at {_join_slot_phrases(slot_phrases)}"
     else:
         unavailable_line = (
             f"{formatted_requested} for {service_name} is {reason_text} salon-wide."
         )
-        slot_phrases = [
-            f"{slot.start_time.strftime('%I:%M %p')} with {slot.staff_name}"
-            for slot in result.alternatives
+        lead_line = "We're free at:"
+        slot_lines = [
+            f"{index}) {slot.start_time.strftime('%I:%M %p')} with {slot.staff_name}"
+            for index, slot in enumerate(result.alternatives, start=1)
         ]
-        free_line = f"We're free at {_join_slot_phrases(slot_phrases)}"
 
     closing = (
-        "want this instead?" if len(result.alternatives) == 1 else "want one of these?"
+        "Want this instead?" if len(result.alternatives) == 1 else "Want one of these?"
     )
-    return f"{unavailable_line} {free_line} — {closing}"
+    lines = [unavailable_line, lead_line, *slot_lines, closing]
+    return "\n".join(lines)
