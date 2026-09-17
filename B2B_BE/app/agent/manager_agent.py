@@ -10,6 +10,13 @@ and ``build_proposed_availability_change`` — plus one addition by APPOINTMEN-1
   §2) defines for a resolved ``SpeakerContext``: one line for Owner/Admin,
   one for Staff. It is additive alongside ``describe_speaker`` (left
   unchanged, per APPOINTMEN-17), not a replacement for it.
+
+APPOINTMEN-40 (FR-18, Confirmation required before catalog changes apply) adds
+``render_proposed_service_change_restatement`` and
+``present_proposed_service_change_for_confirmation`` — the restatement text and
+SM-4a-equivalent checkpoint hook point for a pending ``ProposedService`` /
+``ProposedServiceEdit`` / ``ProposedServiceDeletion`` (``app.domain.services``),
+ahead of that module's existing ``confirm_and_*_service`` write gates.
 """
 
 import logging
@@ -24,6 +31,11 @@ from app.domain.conflict_verification import VerifiedConflictCheck
 from app.domain.conflicts import ConflictCheckResult
 from app.domain.dashboard_access import decline_staff_dashboard_request
 from app.domain.schedule_override import decline_staff_schedule_override
+from app.domain.services import (
+    ProposedService,
+    ProposedServiceDeletion,
+    ProposedServiceEdit,
+)
 from app.models.staff import StaffRole
 from app.tools.staff import resolve_staff_identity
 
@@ -131,6 +143,66 @@ def present_conflict_check_for_verification(
         ],
     )
     return VerifiedConflictCheck(result=result)
+
+
+def render_proposed_service_change_restatement(
+    proposed: ProposedService | ProposedServiceEdit | ProposedServiceDeletion,
+) -> str:
+    """Render the human-readable restatement of a pending catalog change (FR-18).
+
+    Dispatches on the concrete type to produce the text Ramesh is shown ahead of
+    confirming: ``ProposedService`` restates the new service's name and price;
+    ``ProposedServiceEdit`` restates only the fields actually set on it (mirroring
+    its own "at least one of new_name/new_price" shape); ``ProposedServiceDeletion``
+    restates the ``service_id`` being removed, since that is all the type carries —
+    resolving it to a service name would require a DB lookup, out of scope here (see
+    the APPOINTMEN-40 plan's Risks). Every branch ends in an explicit ask for
+    confirmation. Pure function, no I/O, no DB access — matches the style of this
+    module's ``render_identity_greeting``/``describe_speaker``.
+    """
+    if isinstance(proposed, ProposedService):
+        return (
+            f"You're adding a new service: {proposed.name!r} at "
+            f"{proposed.price!r}. Shall I confirm this?"
+        )
+    if isinstance(proposed, ProposedServiceEdit):
+        changes = []
+        if proposed.new_name is not None:
+            changes.append(f"name to {proposed.new_name!r}")
+        if proposed.new_price is not None:
+            changes.append(f"price to {proposed.new_price!r}")
+        change_text = " and ".join(changes)
+        return (
+            f"You're editing service {proposed.service_id!r}: changing "
+            f"{change_text}. Shall I confirm this?"
+        )
+    return (
+        f"You're removing service {proposed.service_id!r} from the catalog. "
+        "Shall I confirm this?"
+    )
+
+
+def present_proposed_service_change_for_confirmation(
+    proposed: ProposedService | ProposedServiceEdit | ProposedServiceDeletion,
+) -> str:
+    """Surface a freshly-restated catalog change for the FR-18 checkpoint (APPOINTMEN-40).
+
+    This is the hook point a future conversational Manager Agent loop will call
+    immediately after a ``ProposedService``/``ProposedServiceEdit``/
+    ``ProposedServiceDeletion`` has been built, before any call to
+    ``confirm_and_create_service`` / ``confirm_and_update_service`` /
+    ``confirm_and_delete_service`` (``app.domain.services``). It logs the restated
+    proposal as the observable checkpoint moment and returns the restatement text
+    from ``render_proposed_service_change_restatement`` for a future conversational
+    loop to send to Ramesh, whose explicit yes/no is then recorded via
+    ``app.tools.catalog_change_confirmation.confirm_catalog_change`` before any of
+    the ``confirm_and_*_service`` gates will let the write through.
+    """
+    _logger.info(
+        "FR-18 checkpoint - proposed catalog change awaiting human confirmation: %r",
+        proposed,
+    )
+    return render_proposed_service_change_restatement(proposed)
 
 
 def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
