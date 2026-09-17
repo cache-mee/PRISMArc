@@ -43,7 +43,8 @@ notes) — see `.orchestration/runs/planning-salon-app/handoff.md` for the full 
   to match (Infra row, Forbidden bullet, Secrets bullet), sign-off recorded in its frontmatter. Gate 3
   itself was not reopened — the stack (React/FastAPI/Postgres/Twilio) is unchanged, only the hosting
   mechanism. Open item carried forward: CloudFront/EC2 cross-origin `fetch()` calls + no CORS on the
-  backend, not yet resolved. Tracked in Jira: APPOINTMEN-60. Branch: `chore/APPOINTMEN-60-finalize-hosting`.
+  backend, not yet resolved. Tracked in Jira: APPOINTMEN-61 (original APPOINTMEN-60 deleted by user, recreated as
+  APPOINTMEN-61). Branch: `chore/APPOINTMEN-60-finalize-hosting` (name unchanged; PR #66).
 
 ## Phase Status
 
