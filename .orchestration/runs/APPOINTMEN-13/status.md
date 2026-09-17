@@ -36,6 +36,8 @@ Ready for Review →   In Review        [done]
 Ready for QA     →   In QA            [done]
 QA Done          →   QA Done          [done]
 QA Done          →   Ready for UAT    [done, explicit user override — no QA actually ran]
+UAT Approved     →   UAT Approved     [done, explicit user override]
+Done             →   Done             [done, explicit user request — no formal UAT sign-off actually occurred]
 
 ## Issues & Blockers (resolved, kept for audit trail)
 - develop advanced significantly while this ticket was in flight; other tickets (14/15/17/18/19/22/26/33)
@@ -56,4 +58,4 @@ QA Done          →   Ready for UAT    [done, explicit user override — no QA 
 
 ## How to Resume
 Ticket complete — nothing to resume. PR #21 merged into develop (88005d6); feature branch deleted from
-remote post-merge; Jira at Ready for UAT.
+remote post-merge; Jira at Done.

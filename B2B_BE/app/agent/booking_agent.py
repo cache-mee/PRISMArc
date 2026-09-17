@@ -1,6 +1,6 @@
 """Booking Agent turn logic.
 
-Houses two independent pieces of Booking Agent behavior added by separate
+Houses four independent pieces of Booking Agent behavior added by separate
 tickets:
 
 - ``handle_message`` — FR-1's identity-resolution gate (APPOINTMEN-14). The
@@ -24,6 +24,14 @@ tickets:
   that the identity gate above runs first, every time, before that
   placeholder (or any future real intent handling) executes.
 
+- ``present_intent_for_verification`` — the SM-4a human-verification
+  checkpoint (APPOINTMEN-21) referenced by ``confirm_exact_match`` below.
+  Logs a freshly-parsed ``BookingIntent`` (``app.agent.booking_intent``) as
+  the observable checkpoint moment and returns it wrapped, unverified, in a
+  ``VerifiedBookingIntent``. Not customer-visible. A human operator reviews
+  or corrects it before ``app.domain.booking_intent_verification.require_verified_intent``
+  will let any downstream code act on it.
+
 - ``confirm_exact_match`` — FR-6's direct-confirmation prompt
   (APPOINTMEN-22). The hook point a future conversational Booking Agent
   loop will call once intent parsing, staff-preference limiting, the SM-4a
@@ -39,16 +47,24 @@ tickets:
   bookable alternative, so a rejected exact-time request never dead-ends
   the conversation.
 
+- ``list_day_slots`` — FR-7's day-only slot listing (APPOINTMEN-23). The
+  hook point a future conversational Booking Agent loop will call once
+  intent parsing has resolved a day-only (no exact time) request, mirroring
+  ``confirm_exact_match``'s not-yet-wired-in posture.
+
 These pieces do not yet call each other — wiring the identity-resolved turn
-loop into intent parsing and booking confirmation/alternatives is future,
-out-of-scope work (Epic 2/3).
+loop into intent parsing, the SM-4a checkpoint, and booking
+confirmation/alternatives/day-slot listing is future, out-of-scope work
+(Epic 2/3).
 """
 
-from datetime import datetime
+import logging
+from datetime import date, datetime
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.booking_intent import BookingIntent
 from app.agent.state import session_store
 from app.domain.appointments import (
     ResolvedBookingCandidate,
@@ -56,7 +72,15 @@ from app.domain.appointments import (
     render_alternative_slots,
     render_direct_confirmation,
 )
+from app.domain.availability import (
+    OpenSlot,
+    list_open_slots_for_day,
+    render_day_slot_list,
+)
+from app.domain.booking_intent_verification import VerifiedBookingIntent
 from app.domain.identity import resolve_customer_by_phone
+
+_logger = logging.getLogger(__name__)
 
 _ASK_PHONE_NUMBER = "Could I get your phone number to pull up your account?"
 _NEW_CUSTOMER_INTERIM = "I don't have that number on file yet — what's your name?"
@@ -115,6 +139,30 @@ async def handle_message(db: AsyncSession, session_id: str, message: str | None)
     return _NEW_CUSTOMER_INTERIM
 
 
+def present_intent_for_verification(intent: BookingIntent) -> VerifiedBookingIntent:
+    """Surface a freshly-parsed ``BookingIntent`` for the SM-4a checkpoint (APPOINTMEN-21).
+
+    This is the hook point a future conversational Booking Agent loop will
+    call immediately after ``parse_booking_intent``
+    (``app.agent.booking_intent``), before staff-preference limiting, an
+    actual availability check, or any Story 2.5/2.6/2.7 (FR-6/7/8)
+    resolution code runs. Not customer-visible — it logs the parsed intent
+    as the observable checkpoint moment and returns an unverified
+    ``VerifiedBookingIntent``; a human operator reviews or corrects it and
+    sets ``verified`` to ``True`` before
+    ``app.domain.booking_intent_verification.require_verified_intent`` will
+    let it through.
+    """
+    _logger.info(
+        "SM-4a checkpoint - parsed booking intent awaiting human verification: "
+        "service_name=%r requested_time=%r staff_preference=%r",
+        intent.service_name,
+        intent.requested_time,
+        intent.staff_preference,
+    )
+    return VerifiedBookingIntent(intent=intent)
+
+
 class DirectConfirmationPrompt(BaseModel):
     """The FR-6 direct-confirmation prompt awaiting the Customer's answer."""
 
@@ -166,3 +214,29 @@ async def present_nearest_alternatives(
         staff_name=staff_name,
     )
     return render_alternative_slots(result, service_name)
+
+
+class DaySlotListing(BaseModel):
+    """The FR-7 day-only slot listing ready to send to the Customer."""
+
+    day: date
+    slots: list[OpenSlot]
+    message: str
+
+
+async def list_day_slots(
+    db: AsyncSession, day: date, staff_name: str | None = None
+) -> DaySlotListing:
+    """List and render a day's open slots for the Customer (FR-7).
+
+    This is the hook point a future conversational Booking Agent loop will
+    call once intent parsing has resolved a day-only (no exact time)
+    request, exactly the same not-yet-wired-in posture ``confirm_exact_match``
+    already has for FR-6. Delegates the actual query/filter logic to
+    ``app.domain.availability.list_open_slots_for_day`` and rendering to
+    ``render_day_slot_list``, returning both as a ``DaySlotListing`` for that
+    future loop to consume.
+    """
+    slots = await list_open_slots_for_day(db, day, staff_name)
+    message = render_day_slot_list(day, slots)
+    return DaySlotListing(day=day, slots=slots, message=message)

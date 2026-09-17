@@ -34,3 +34,5 @@ Next:   none — ticket complete
 | 24 | [dev] Gate — Jira status after merge | human | done | "Move to Ready for UAT (done-category)" | 2026-09-17T15:55:00+00:00 |
 | 25 | [dev] Jira transitions to Ready for UAT | lead | done | jira:transitioned (In Review → In QA → QA Done → Ready for UAT) | 2026-09-17T15:55:30+00:00 |
 | 26 | [dev] Cleanup — delete 19 stale/merged remote branches | lead | done | approved; incl. feature/APPOINTMEN-13-shared-data-store-entities itself | 2026-09-17T15:53:00+00:00 |
+| 27 | [dev] Gate — Move ticket to Done | human | done | "move the ticket to done" | 2026-09-17T16:26:00+00:00 |
+| 28 | [dev] Jira transitions to Done | lead | done | jira:transitioned (Ready for UAT → UAT Approved → Done) | 2026-09-17T16:27:41+00:00 |
