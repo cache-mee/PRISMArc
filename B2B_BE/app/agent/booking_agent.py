@@ -1,29 +1,45 @@
-"""Booking Agent turn logic — FR-1's identity-resolution gate (APPOINTMEN-14).
+"""Booking Agent turn logic.
 
-``handle_message`` is the one deterministic state machine implementing all
-three of FR-1's acceptance criteria, per the UX spec
-(`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/customer-booking-chat.md`
-§3.1):
+Houses two independent pieces of Booking Agent behavior added by separate
+tickets:
 
-1. Before any booking/browse-history/cancel/reschedule action, the agent
-   always asks for a phone number first (AC1).
-2. A phone number matching an existing ``Customer`` record greets the
-   Customer by name and proceeds straight to the stated intent — no name
-   question is ever asked (AC2).
-3. A phone number with no match hands off to Story 1.3 (FR-2) — this ticket
-   only defines and calls that hand-off point, it does not implement it
-   (AC3).
+- ``handle_message`` — FR-1's identity-resolution gate (APPOINTMEN-14). The
+  one deterministic state machine implementing all three of FR-1's
+  acceptance criteria, per the UX spec
+  (`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/customer-booking-chat.md`
+  §3.1):
 
-No real booking/browse/cancel/reschedule logic is implemented here (Epic
-2/3, out of scope) — once a session is resolved, this module returns a
-placeholder acknowledgement only. The important, in-scope guarantee is that
-the identity gate above runs first, every time, before that placeholder (or
-any future real intent handling) executes.
+  1. Before any booking/browse-history/cancel/reschedule action, the agent
+     always asks for a phone number first (AC1).
+  2. A phone number matching an existing ``Customer`` record greets the
+     Customer by name and proceeds straight to the stated intent — no name
+     question is ever asked (AC2).
+  3. A phone number with no match hands off to Story 1.3 (FR-2) — this
+     ticket only defines and calls that hand-off point, it does not
+     implement it (AC3).
+
+  No real booking/browse/cancel/reschedule logic is implemented here (Epic
+  2/3, out of scope) — once a session is resolved, this module returns a
+  placeholder acknowledgement only. The important, in-scope guarantee is
+  that the identity gate above runs first, every time, before that
+  placeholder (or any future real intent handling) executes.
+
+- ``confirm_exact_match`` — FR-6's direct-confirmation prompt
+  (APPOINTMEN-22). The hook point a future conversational Booking Agent
+  loop will call once intent parsing, staff-preference limiting, the SM-4a
+  checkpoint, and an actual availability check have all resolved to one
+  candidate slot.
+
+These two pieces do not yet call each other — wiring the identity-resolved
+turn loop into intent parsing and booking confirmation is future,
+out-of-scope work (Epic 2/3).
 """
 
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agent.state import session_store
+from app.domain.appointments import ResolvedBookingCandidate, render_direct_confirmation
 from app.domain.identity import resolve_customer_by_phone
 
 _ASK_PHONE_NUMBER = "Could I get your phone number to pull up your account?"
@@ -81,3 +97,26 @@ def handle_message(db: Session, session_id: str, message: str | None) -> str:
     session_store.save(session_id, state)
     hand_off_to_new_customer_flow(session_id, phone_number)
     return _NEW_CUSTOMER_INTERIM
+
+
+class DirectConfirmationPrompt(BaseModel):
+    """The FR-6 direct-confirmation prompt awaiting the Customer's answer."""
+
+    candidate: ResolvedBookingCandidate
+    message: str
+    confirmed: bool = False
+
+
+def confirm_exact_match(
+    candidate: ResolvedBookingCandidate,
+) -> DirectConfirmationPrompt:
+    """Render the FR-6 confirmation for a resolved candidate.
+
+    This is the hook point a future conversational Booking Agent loop will
+    call once intent parsing, staff-preference limiting, the SM-4a
+    checkpoint, and an actual availability check have all resolved to one
+    candidate slot. `confirmed` stays False until the Customer explicitly
+    confirms; no Booking write may proceed before that.
+    """
+    message = render_direct_confirmation(candidate)
+    return DirectConfirmationPrompt(candidate=candidate, message=message)

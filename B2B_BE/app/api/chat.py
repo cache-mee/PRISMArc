@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.agent import booking_agent
-from app.db import get_db
+from app.database import get_db
 
 router = APIRouter()
 
