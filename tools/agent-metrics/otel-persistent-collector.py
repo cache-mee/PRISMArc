@@ -121,7 +121,11 @@ class Ledger:
             for name, res_attrs, attrs, val, temporality in otlp_points(payload):
                 if name not in (COST_METRIC, TOKEN_METRIC):
                     continue
-                session = res_attrs.get("session.id") or "unknown"
+                # Claude Code puts session.id on the DATA POINT's own attributes, not the
+                # resource's, unlike a typical OTel resource attribute - confirmed against a
+                # real export from claude-code 2.1.273. Resource attrs are still checked as a
+                # fallback in case that ever changes or another exporter differs.
+                session = attrs.get("session.id") or res_attrs.get("session.id") or "unknown"
                 key = (session, name, tuple(sorted(attrs.items())))
                 if temporality == CUMULATIVE:
                     delta = val - self.seen.get(key, 0.0)
@@ -142,6 +146,20 @@ class Ledger:
                 for row in rows:
                     f.write(json.dumps(row, ensure_ascii=False) + "\n")
         return len(rows)
+
+
+class SingleInstanceHTTPServer(ThreadingHTTPServer):
+    """`socketserver.TCPServer.allow_reuse_address` defaults to True, and on WINDOWS
+    (unlike POSIX, where it mainly just skips TIME_WAIT) that lets a second process bind
+    to a port another process is already actively listening on - both "succeed" with no
+    error, and the OS silently splits traffic between them. Confirmed the hard way: a
+    `SessionStart` hook firing on several session resumes left five collector processes all
+    "listening" on 4318 at once, invisible to `already_listening()`'s own connect probe
+    (which just confirms *something* answers, not that autostart's own check-then-spawn is
+    exclusive). Disabling it here makes a real conflict fail loudly - address already in
+    use - which is what should happen when a collector is already running.
+    """
+    allow_reuse_address = False
 
 
 def serve(port: int, out_path: Path) -> None:
@@ -171,7 +189,7 @@ def serve(port: int, out_path: Path) -> None:
         def log_message(self, *_a):
             return
 
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    srv = SingleInstanceHTTPServer(("127.0.0.1", port), Handler)
     print(f"listening on http://127.0.0.1:{port}  (Ctrl+C to stop)")
     print(f"writing to {out_path}")
     print("point Claude Code sessions at this with OTEL_EXPORTER_OTLP_ENDPOINT="
@@ -182,12 +200,16 @@ def serve(port: int, out_path: Path) -> None:
         pass
 
 
-def report(in_path: Path, by: str, since: str | None) -> None:
+def collect(in_path: Path, by: str, since: str | None,
+            session: str | None) -> list[dict]:
+    """Group logged rows by `by` (optionally restricted to one `session`), and return one
+    dict per group with cost_usd and the four token metrics summed, plus total_tokens
+    derived. Used by both the text and JSON report renderers, and by a caller (e.g. an
+    SDLC skill) that wants the numbers for exactly one session it just ran.
+    """
     if not in_path.exists():
-        print(f"no rows in {in_path}")
-        return
+        return []
     groups: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    total_rows = 0
     with in_path.open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -196,27 +218,54 @@ def report(in_path: Path, by: str, since: str | None) -> None:
             row = json.loads(line)
             if since and row["ts"][:10] < since:
                 continue
+            if session and row.get("session") != session:
+                continue
             key = row.get(by, "-")
             g = groups[key]
+            g.setdefault("session", row.get("session", "-"))
+            g.setdefault("last_ts", row["ts"])
+            g["last_ts"] = max(g["last_ts"], row["ts"])
             if row["metric"] == COST_METRIC:
                 g["cost_usd"] += row["value"]
             else:
                 metric = TOKEN_TYPES.get(row.get("type") or "")
                 if metric:
                     g[metric] += row["value"]
-            total_rows += 1
-    if not total_rows:
-        print(f"no rows{' since ' + since if since else ''} in {in_path}")
-        return
-    for key, g in sorted(groups.items(), key=lambda kv: -kv[1].get("cost_usd", 0)):
+    out = []
+    for key, g in groups.items():
         total_tokens = sum(g.get(m, 0) for m in
                            ("input_tokens", "output_tokens",
                             "cache_read_tokens", "cache_creation_tokens"))
-        print(f"{by}={key:<24}  cost_usd={g.get('cost_usd', 0):.4f}  "
-              f"total_tokens={int(total_tokens)}  "
-              f"input={int(g.get('input_tokens', 0))}  output={int(g.get('output_tokens', 0))}  "
-              f"cache_read={int(g.get('cache_read_tokens', 0))}  "
-              f"cache_creation={int(g.get('cache_creation_tokens', 0))}")
+        out.append({
+            by: key, "cost_usd": round(g.get("cost_usd", 0), 6),
+            "total_tokens": int(total_tokens),
+            "input_tokens": int(g.get("input_tokens", 0)),
+            "output_tokens": int(g.get("output_tokens", 0)),
+            "cache_read_tokens": int(g.get("cache_read_tokens", 0)),
+            "cache_creation_tokens": int(g.get("cache_creation_tokens", 0)),
+            "session": g.get("session", "-"), "last_ts": g.get("last_ts")})
+    return sorted(out, key=lambda r: -r["cost_usd"])
+
+
+def report(in_path: Path, by: str, since: str | None, session: str | None,
+           as_json: bool) -> None:
+    rows = collect(in_path, by, since, session)
+    if not rows:
+        if as_json:
+            print("[]")
+        else:
+            scope = f"session={session}" if session else (f"since {since}" if since else "")
+            print(f"no rows {scope} in {in_path}".strip())
+        return
+    if as_json:
+        print(json.dumps(rows, indent=2))
+        return
+    for r in rows:
+        print(f"{by}={r[by]:<24}  cost_usd={r['cost_usd']:.4f}  "
+              f"total_tokens={r['total_tokens']}  "
+              f"input={r['input_tokens']}  output={r['output_tokens']}  "
+              f"cache_read={r['cache_read_tokens']}  "
+              f"cache_creation={r['cache_creation_tokens']}")
 
 
 def already_listening(port: int) -> bool:
@@ -280,35 +329,53 @@ def self_test() -> int:
         out = Path(tmp) / "otel-sessions.jsonl"
         ledger = Ledger(out)
 
+        # session.id lives on the DATA POINT's own attributes in a real Claude Code export
+        # (confirmed against a live 2.1.273 capture) - NOT on the resource, unlike a typical
+        # OTel resource attribute. Every test below puts it there to match reality.
         n = ledger.ingest(_body([
             (COST_METRIC, {"model": "opus-5", "query_source": "subagent",
-                           "agent.name": "test"}, 0.018),
+                           "agent.name": "test", "session.id": "sess-a"}, 0.018),
             (TOKEN_METRIC, {"model": "opus-5", "query_source": "subagent",
-                            "agent.name": "test", "type": "output"}, 400),
-        ], resource_attrs={"session.id": "sess-a"}))
+                            "agent.name": "test", "session.id": "sess-a",
+                            "type": "output"}, 400),
+        ]))
         check("ingest returns the row count it wrote", n == 2)
         check("output file created", out.exists())
 
         n2 = ledger.ingest(_body([
-            (COST_METRIC, {"model": "opus-5", "query_source": "main"}, 0.5)],
-            resource_attrs={"session.id": "sess-b"}))
+            (COST_METRIC, {"model": "opus-5", "query_source": "main",
+                           "session.id": "sess-b"}, 0.5)]))
         check("a second, concurrent session is kept separate", n2 == 1)
 
         lines = out.read_text(encoding="utf-8").splitlines()
         check("one line per accepted delta", len(lines) == 3)
         rows = [json.loads(l) for l in lines]
-        check("session id carried from resource attributes",
+        check("session id read from the data point's own attributes",
               {r["session"] for r in rows} == {"sess-a", "sess-b"})
+
+        # Resource-level session.id is a fallback only (kept in case some other exporter
+        # puts it there), never the primary source - so it must lose to a data point value.
+        n_fallback = ledger.ingest(_body(
+            [(COST_METRIC, {"model": "opus-5", "query_source": "main"}, 0.1)],
+            resource_attrs={"session.id": "sess-from-resource"}))
+        check("falls back to resource attrs when the data point has no session.id",
+              n_fallback == 1 and json.loads(out.read_text(encoding="utf-8")
+                                             .splitlines()[-1])["session"] == "sess-from-resource")
 
         # DELTA export from the same session ADDS, not replaces.
         ledger.ingest(_body([(COST_METRIC, {"model": "opus-5", "query_source": "subagent",
-                                            "agent.name": "test"}, 0.031)],
-                            resource_attrs={"session.id": "sess-a"}))
-        report(out, "session", None)  # exercise the report path; visual check only
+                                            "agent.name": "test",
+                                            "session.id": "sess-a"}, 0.031)]))
+        report(out, "session", None, None, False)  # exercise the report path; visual check
+        check("session filter isolates one session's rows",
+              {r["session"] for r in collect(out, "agent", None, "sess-a")} == {"sess-a"})
+        json_rows = collect(out, "agent", None, "sess-a")
+        check("collect() returns a per-agent breakdown for one session",
+              any(r["agent"] == "test" for r in json_rows))
 
         # Negative: an unrelated metric produces no row.
-        n3 = ledger.ingest(_body([("claude_code.session.count", {}, 1)],
-                                 resource_attrs={"session.id": "sess-a"}))
+        n3 = ledger.ingest(_body([("claude_code.session.count",
+                                   {"session.id": "sess-a"}, 1)]))
         check("unrelated metric ignored", n3 == 0)
 
         # Negative: malformed OTLP must not raise.
@@ -342,8 +409,8 @@ def self_test() -> int:
         try:
             import urllib.request
             data = json.dumps(_body([(COST_METRIC, {"model": "m", "query_source": "subagent",
-                                                     "agent.name": "reviewer"}, 0.5)],
-                                    resource_attrs={"session.id": "sess-live"})).encode()
+                                                     "agent.name": "reviewer",
+                                                     "session.id": "sess-live"}, 0.5)])).encode()
             urllib.request.urlopen(urllib.request.Request(
                 f"http://127.0.0.1:{port}/v1/metrics", data=data,
                 headers={"Content-Type": "application/json"}), timeout=5).read()
@@ -351,6 +418,19 @@ def self_test() -> int:
                   "sess-live" in srv_ledger.out_path.read_text(encoding="utf-8"))
         finally:
             live.shutdown()
+
+        # A second bind to the SAME port a real collector already holds must fail loudly,
+        # not silently succeed (the Windows allow_reuse_address hazard this class exists for).
+        first = SingleInstanceHTTPServer(("127.0.0.1", 0), Handler)
+        try:
+            bound_port = first.server_port
+            try:
+                SingleInstanceHTTPServer(("127.0.0.1", bound_port), Handler)
+                check("a second bind to an already-listening port is rejected", False)
+            except OSError:
+                check("a second bind to an already-listening port is rejected", True)
+        finally:
+            first.server_close()
 
     print(f"\n{len(fails)} failing" if fails else "\nPASS")
     return 1 if fails else 0
@@ -369,6 +449,10 @@ def main() -> int:
     pr.add_argument("--by", default="session", choices=["session", "agent", "model",
                                                         "query_source"])
     pr.add_argument("--since", default=None, help="YYYY-MM-DD")
+    pr.add_argument("--session", default=None,
+                    help="restrict to one session id (e.g. $CLAUDE_CODE_SESSION_ID); "
+                         "combine with --by agent for a per-agent breakdown of just it")
+    pr.add_argument("--json", action="store_true")
     pr.add_argument("--in", dest="in_path", type=Path, default=DEFAULT_OUT)
 
     pa = sub.add_parser("autostart", help="start the collector in the background if "
@@ -385,7 +469,7 @@ def main() -> int:
         serve(args.port, args.out)
         return 0
     if args.cmd == "report":
-        report(args.in_path, args.by, args.since)
+        report(args.in_path, args.by, args.since, args.session, args.json)
         return 0
     if args.cmd == "autostart":
         autostart(args.port, args.out, args.log)

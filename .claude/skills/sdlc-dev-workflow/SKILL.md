@@ -57,6 +57,45 @@ Schema: `.orchestration/schemas/run-record.md`.
 
 ---
 
+## Session Cost (agent-metrics, optional)
+
+Purely informational — separate from the schema in `.orchestration/schemas/run-record.md` and
+never read by `tools/agent-metrics`' own `runrecord.py` (it only parses six-column `|` rows;
+this block deliberately isn't one, so it can never be mis-parsed as run-record data).
+
+Right before this workflow's last action (its final phase or gate reply — i.e. immediately
+before handing off to `sdlc-unit-test-workflow` or ending), try to append a cost summary for
+the session that just did the work:
+
+1. Resolve a real Python 3 the same way this repo's `SessionStart` hook does — try `python`,
+   `python3`, `py -3` in that order, actually executing `-c "import sys; sys.exit(0 if
+   sys.version_info[0]==3 else 1)"` to verify (do not trust `command -v` alone — a broken
+   Windows Store `python3` stub can pass that check without running anything).
+2. Run:
+   `<python> tools/agent-metrics/otel-persistent-collector.py report --by agent --session "$CLAUDE_CODE_SESSION_ID" --json`
+3. If the command fails, errors, or returns `[]`, skip this step entirely — never fail, retry,
+   or gate the workflow over missing telemetry (it just means the collector wasn't running, or
+   this session predates telemetry being enabled).
+4. Otherwise, **append** (never overwrite — a prior `## Session Cost` block from an earlier
+   session on this same ticket must stay exactly as it is) a new block at the very end of
+   `{run_record}`:
+
+   ```
+   ## Session Cost
+
+   **Session `<id>`** — <At timestamp, same convention as run-record rows>
+
+   <agent>: $<cost_usd, 4dp>  (<total_tokens, comma-grouped> tokens)
+   ... one line per JSON row, in the order returned (already sorted by cost, highest first) ...
+   ─────────────────────────────
+   session total: $<sum of cost_usd>  (<sum of total_tokens> tokens)
+   ```
+
+   An agent name of `-` in the JSON means the orchestrating thread's own cost (not delegated to
+   a named subagent) — render it as `orchestrator` rather than `-`.
+
+---
+
 ## Status Artefacts (workflow-status)
 
 Schema: `.orchestration/schemas/ticket-status.md`. These are separate from `{run_record}` —
