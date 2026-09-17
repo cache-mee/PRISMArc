@@ -1,6 +1,6 @@
 """Booking Agent turn logic.
 
-Houses two independent pieces of Booking Agent behavior added by separate
+Houses four independent pieces of Booking Agent behavior added by separate
 tickets:
 
 - ``handle_message`` — FR-1's identity-resolution gate (APPOINTMEN-14). The
@@ -38,19 +38,45 @@ tickets:
   checkpoint, and an actual availability check have all resolved to one
   candidate slot.
 
-These three pieces do not yet call each other — wiring the identity-resolved
-turn loop into intent parsing, the SM-4a checkpoint, and booking confirmation
-is future, out-of-scope work (Epic 2/3).
+- ``present_nearest_alternatives`` — FR-8's nearest-alternative(s) message
+  (APPOINTMEN-24). The hook point a future conversational Booking Agent
+  loop will call instead of ``confirm_exact_match`` once intent parsing and
+  the SM-4a checkpoint have determined the Customer's named exact time did
+  not resolve directly — it names the reason the requested time is
+  unavailable (already booked or blocked) and at least one concrete,
+  bookable alternative, so a rejected exact-time request never dead-ends
+  the conversation.
+
+- ``list_day_slots`` — FR-7's day-only slot listing (APPOINTMEN-23). The
+  hook point a future conversational Booking Agent loop will call once
+  intent parsing has resolved a day-only (no exact time) request, mirroring
+  ``confirm_exact_match``'s not-yet-wired-in posture.
+
+These pieces do not yet call each other — wiring the identity-resolved turn
+loop into intent parsing, the SM-4a checkpoint, and booking
+confirmation/alternatives/day-slot listing is future, out-of-scope work
+(Epic 2/3).
 """
 
 import logging
+from datetime import date, datetime
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.booking_intent import BookingIntent
 from app.agent.state import session_store
-from app.domain.appointments import ResolvedBookingCandidate, render_direct_confirmation
+from app.domain.appointments import (
+    ResolvedBookingCandidate,
+    find_nearest_alternatives,
+    render_alternative_slots,
+    render_direct_confirmation,
+)
+from app.domain.availability import (
+    OpenSlot,
+    list_open_slots_for_day,
+    render_day_slot_list,
+)
 from app.domain.booking_intent_verification import VerifiedBookingIntent
 from app.domain.identity import resolve_customer_by_phone
 
@@ -158,3 +184,59 @@ def confirm_exact_match(
     """
     message = render_direct_confirmation(candidate)
     return DirectConfirmationPrompt(candidate=candidate, message=message)
+
+
+async def present_nearest_alternatives(
+    db: AsyncSession,
+    *,
+    service_name: str,
+    requested_time: datetime,
+    staff_name: str | None = None,
+) -> str:
+    """Present the FR-8 nearest-alternative(s) message for an unavailable exact time.
+
+    This is the FR-8 counterpart to ``confirm_exact_match`` (FR-6) — the
+    hook point a future conversational Booking Agent loop will call once
+    intent parsing (FR-5) and the SM-4a checkpoint have determined the
+    Customer's named exact time did not resolve directly. Calls
+    ``find_nearest_alternatives`` to resolve the candidate staff set, the
+    unavailability reason, and up to two nearest free alternative slots,
+    then ``render_alternative_slots`` to turn that into the Customer-facing
+    message. Raises ``StaffNotFoundError`` or ``NoAlternativeSlotFoundError``
+    exactly as ``find_nearest_alternatives`` does — no wiring into a live
+    conversational loop exists yet (see the APPOINTMEN-24 implementation
+    plan's Technical Context).
+    """
+    result = await find_nearest_alternatives(
+        db,
+        service_name=service_name,
+        requested_time=requested_time,
+        staff_name=staff_name,
+    )
+    return render_alternative_slots(result, service_name)
+
+
+class DaySlotListing(BaseModel):
+    """The FR-7 day-only slot listing ready to send to the Customer."""
+
+    day: date
+    slots: list[OpenSlot]
+    message: str
+
+
+async def list_day_slots(
+    db: AsyncSession, day: date, staff_name: str | None = None
+) -> DaySlotListing:
+    """List and render a day's open slots for the Customer (FR-7).
+
+    This is the hook point a future conversational Booking Agent loop will
+    call once intent parsing has resolved a day-only (no exact time)
+    request, exactly the same not-yet-wired-in posture ``confirm_exact_match``
+    already has for FR-6. Delegates the actual query/filter logic to
+    ``app.domain.availability.list_open_slots_for_day`` and rendering to
+    ``render_day_slot_list``, returning both as a ``DaySlotListing`` for that
+    future loop to consume.
+    """
+    slots = await list_open_slots_for_day(db, day, staff_name)
+    message = render_day_slot_list(day, slots)
+    return DaySlotListing(day=day, slots=slots, message=message)
