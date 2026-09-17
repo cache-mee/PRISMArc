@@ -30,11 +30,12 @@ tickets:
   When absent (Web Chat's call site, unchanged), ``message`` itself is
   treated as the phone number once asked for, exactly as before.
 
-  No real booking/browse/cancel/reschedule logic is implemented here (Epic
-  2/3, out of scope) — once a session is resolved, this module returns a
-  placeholder acknowledgement only. The important, in-scope guarantee is
-  that the identity gate above runs first, every time, before that
-  placeholder (or any future real intent handling) executes.
+  Once a session is resolved, every further turn is handed to
+  ``run_booking_conversation`` (APPOINTMEN-54, see below) rather than a
+  placeholder acknowledgement. The important, in-scope guarantee this gate
+  still provides is that identity resolution above always runs first, every
+  time, before that real conversational loop (or, previously, its
+  placeholder) executes.
 
 - ``present_intent_for_verification`` — the SM-4a human-verification
   checkpoint (APPOINTMEN-21) referenced by ``confirm_exact_match`` below.
@@ -75,20 +76,36 @@ tickets:
   ``app.domain.alternative_slot_verification.require_verified_alternative_slot``
   will let any downstream "offer to customer" code act on it.
 
-These pieces do not yet call each other — wiring the identity-resolved turn
-loop into intent parsing, the SM-4a checkpoint, and booking
-confirmation/alternatives/day-slot listing/the SM-4b checkpoint is future,
-out-of-scope work (Epic 2/3).
+Once a session is identity-resolved (FR-1/FR-3, ``handle_message`` above), the
+placeholder acknowledgement that used to end the turn there is replaced by
+``run_booking_conversation`` (APPOINTMEN-54): a bounded, ``litellm``-backed
+tool-calling loop in which the model itself decides, turn by turn, whether to
+call ``extract_booking_intent``, ``check_availability``, ``propose_booking``,
+or ``confirm_booking`` (``app.tools.booking_flow``, ``BOOKING_TOOLS``) — thin
+wrappers around ``parse_booking_intent``, ``confirm_exact_match``,
+``present_nearest_alternatives``/``find_nearest_alternatives``,
+``list_day_slots``, ``present_intent_for_verification``, and
+``present_alternative_for_verification`` above, all reused unchanged. This
+wires FR-5/FR-6/FR-7/FR-8/FR-9 together end to end. The one exception is
+``present_nearest_alternatives`` itself, which still has no caller:
+``app.tools.booking_flow.check_availability`` calls
+``find_nearest_alternatives`` directly and renders its own SM-4b checkpoint
+inline, rather than going through this wrapper.
 """
 
+import json
 import logging
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.booking_intent import BookingIntent
+from app.agent.prompts.booking_agent import build_booking_agent_system_prompt
+from app.agent.providers.litellm_provider import LiteLLMProvider
 from app.agent.state import session_store
+from app.agent.state.session_store import SessionState
+from app.config import settings
 from app.domain.alternative_slot_verification import (
     AlternativeSlotSuggestion,
     VerifiedAlternativeSlotSuggestion,
@@ -112,7 +129,11 @@ _logger = logging.getLogger(__name__)
 
 _ASK_PHONE_NUMBER = "Could I get your phone number to pull up your account?"
 _NEW_CUSTOMER_INTERIM = "I don't have that number on file yet — what's your name?"
-_ALREADY_RESOLVED_PLACEHOLDER = "Got it — what would you like to do?"
+_MAX_TOOL_ITERATIONS = 6
+_MAX_ITERATIONS_FALLBACK_MESSAGE = (
+    "Sorry, I'm having trouble finishing that — could you try again, or rephrase "
+    "what you'd like to do?"
+)
 
 
 def hand_off_to_new_customer_flow(session_id: str, phone_number: str) -> None:
@@ -169,11 +190,21 @@ async def handle_message(
       greets the Customer by name and marks the session resolved (AC2); no
       match asks exactly one follow-up question (the Customer's name),
       setting ``awaiting_name`` so the next turn completes resolution (AC3).
+    - Once resolved, every further turn runs ``run_booking_conversation``
+      (APPOINTMEN-54) — the bounded tool-calling loop described in the module
+      docstring — still gated behind this same identity check, unchanged. A
+      resolved session receiving ``message=None`` (no real channel sends this
+      today; both Web Chat and WhatsApp only ever pass ``None`` for the
+      pre-resolution opening turn) has nothing to append to the conversation
+      or hand the model, so it is answered directly with a prompt rather than
+      invoking the loop with an empty user turn.
     """
     state = session_store.get_or_create(session_id)
 
     if state.resolved:
-        return _ALREADY_RESOLVED_PLACEHOLDER
+        if message is None:
+            return _welcome_message(state.customer_name or "there")
+        return await run_booking_conversation(db, session_id, state, message)
 
     if state.awaiting_name:
         if message is None:
@@ -340,3 +371,68 @@ def present_alternative_for_verification(
         suggestion.alternative.staff_name,
     )
     return VerifiedAlternativeSlotSuggestion(suggestion=suggestion)
+
+
+async def run_booking_conversation(
+    db: AsyncSession, session_id: str, state: SessionState, message: str
+) -> str:
+    """Run one bounded, tool-calling conversational turn for a resolved session (APPOINTMEN-54).
+
+    The model decides, turn by turn, whether to call one of ``BOOKING_TOOLS``
+    (``app.tools.booking_flow`` — ``extract_booking_intent``,
+    ``check_availability``, ``propose_booking``, ``confirm_booking``) or to
+    reply directly with no tool call, which ends the loop. Bounded by
+    ``_MAX_TOOL_ITERATIONS``: a model that keeps calling tools without ever
+    settling on a plain-text reply gets a fixed, logged fallback message
+    instead of looping unboundedly or raising to the channel adapter (both
+    Web Chat's ``POST /chat`` and the WhatsApp webhook just relay whatever
+    string comes back).
+
+    ``app.tools.booking_flow`` is imported here, not at module level, because
+    it itself imports several names from this module (``confirm_exact_match``,
+    ``list_day_slots``, ``present_intent_for_verification``,
+    ``present_alternative_for_verification``, ``DirectConfirmationPrompt``) —
+    a module-level import in both directions would be a circular import.
+
+    Persists ``state.history`` (the full running ``messages`` list, including
+    every tool call/result) via ``session_store.save`` before returning, so
+    the next turn for the same ``session_id`` picks up where this one left
+    off.
+    """
+    from app.tools.booking_flow import BOOKING_TOOLS, dispatch_booking_tool
+
+    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    system = build_booking_agent_system_prompt(datetime.now(UTC))
+    messages = [*state.history, {"role": "user", "content": message}]
+
+    response = None
+    for _ in range(_MAX_TOOL_ITERATIONS):
+        response = await provider.generate(
+            system=system, messages=messages, tools=BOOKING_TOOLS
+        )
+        if not response.tool_calls:
+            break
+        messages.append(response.raw_message)
+        for call in response.tool_calls:
+            result = await dispatch_booking_tool(db, state, call.name, call.args)
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": json.dumps(result),
+                }
+            )
+    else:
+        _logger.warning(
+            "run_booking_conversation hit _MAX_TOOL_ITERATIONS=%d for session_id=%r "
+            "without a final plain-text response; returning fallback message.",
+            _MAX_TOOL_ITERATIONS,
+            session_id,
+        )
+        assert response is not None  # the loop always runs at least one iteration
+        response.text = _MAX_ITERATIONS_FALLBACK_MESSAGE
+
+    state.history = messages
+    session_store.save(session_id, state)
+    assert response is not None  # the loop always runs at least one iteration
+    return response.text or _MAX_ITERATIONS_FALLBACK_MESSAGE

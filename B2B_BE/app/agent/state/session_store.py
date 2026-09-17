@@ -37,9 +37,11 @@ class SessionState:
     staff_role: StaffRole | None = None
     manager_resolved: bool = False
 
-    # Manager Agent conversational loop fields — additive only, added by
-    # APPOINTMEN-55. All default so every existing Booking-Agent-only session
-    # is completely unaffected; see ``app.agent.manager_agent.run_manager_turn``.
+    # Conversation history and pending availability-change fields — additive
+    # only, added by APPOINTMEN-54 (Booking Agent conversational loop) and
+    # APPOINTMEN-55 (Manager Agent conversational loop). All default so every
+    # existing call site and behavior (Booking-Agent-only or otherwise) is
+    # unaffected; see ``app.agent.manager_agent.run_manager_turn``.
     history: list[dict] = field(default_factory=list)
     pending_availability_change: ProposedAvailabilityChange | None = None
 
