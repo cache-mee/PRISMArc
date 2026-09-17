@@ -1,8 +1,33 @@
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.booking import Booking
+
+
+def get_bookings_for_staff_in_window(
+    db: Session,
+    *,
+    staff_id: int,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[Booking]:
+    """Return staff_id's bookings whose start_time falls in [window_start, window_end).
+
+    Ordered by start_time. Used by the FR-26 conflict-check mechanism
+    (app.domain.conflicts.check_conflicts).
+    """
+    stmt = (
+        select(Booking)
+        .where(
+            Booking.staff_id == staff_id,
+            Booking.start_time >= window_start,
+            Booking.start_time < window_end,
+        )
+        .order_by(Booking.start_time)
+    )
+    return list(db.execute(stmt).scalars().all())
 
 
 def create_booking(
