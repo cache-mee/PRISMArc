@@ -70,11 +70,11 @@ This skill is AI-development infrastructure (per `CLAUDE.md`'s **The project** s
 shapes how an agent talks in the terminal, not the salon-app product, and it never touches
 `B2B_BE/` or `B2B_FE/`.
 
-It is opt-in per session: no SDLC workflow activates it automatically. Invoke `/caveman` (or
-`/caveman lite|full|ultra`) at the start of a long, read-heavy phase — e.g. Phase 4
-(Code Implementation) or Phase 6 (Code Review) of `sdlc-dev-workflow`, or the test-execution
-phases of `sdlc-qa-workflow` / `sdlc-unit-test-workflow` — to cut conversational token spend.
-Say "stop caveman" to return to normal mode.
+Each SDLC workflow skill (`sdlc-dev-workflow`, `sdlc-planning-workflow`, `sdlc-qa-workflow`,
+`sdlc-unit-test-workflow`) applies this style itself, automatically, from activation — see each
+workflow's "Communication Style (automatic)" section. No `/caveman` invocation is needed inside
+those workflows; `/caveman` remains available standalone for any other session. Say
+"stop caveman" to return to normal mode.
 
 The **Boundaries** section above already keeps this safe to combine with the SDLC workflows
 without extra rules: it never applies to anything persisted to disk or handed to another human

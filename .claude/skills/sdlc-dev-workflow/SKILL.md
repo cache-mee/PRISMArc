@@ -22,14 +22,15 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 
 ---
 
-## Token Efficiency (optional)
+## Communication Style (automatic)
 
-The user may invoke `/caveman` (`.claude/skills/caveman/SKILL.md`) at any point to reduce
-conversational token spend during long phases — most useful in Phase 4 (Code Implementation)
-and Phase 6 (Code Review), which read a lot of code and diff output. It only changes how the
-agent talks; it never applies to persisted artefacts (`{plan_file}`, `{review_file}`, commit
-messages, PR bodies, Jira comments, `{run_record}` rows) and it auto-drops for gate prompts and
-irreversible-action confirmations, so it never makes a human gate ambiguous.
+From activation, apply the caveman compression style (`.claude/skills/caveman/SKILL.md`, level
+`full`) to every piece of conversational output this workflow produces — status updates, phase
+narration, plan summaries shown inline — automatically, for the whole run. No `/caveman`
+command needed; do not wait for the user to ask. It never applies to persisted artefacts
+(`{plan_file}`, `{review_file}`, commit messages, PR bodies, Jira comments, `{run_record}` rows)
+and it auto-drops for gate prompts and irreversible-action confirmations, per that skill's own
+Boundaries and Auto-Clarity rules, so it never makes a human gate ambiguous.
 
 ---
 
