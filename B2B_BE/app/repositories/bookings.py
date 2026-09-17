@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
+from app.models.customer import Customer
 from app.models.staff import Staff
 
 
@@ -14,10 +15,12 @@ async def get_bookings_for_staff_in_window(
     window_start: datetime,
     window_end: datetime,
 ) -> list[Booking]:
-    """Return staff_id's bookings whose start_time falls in [window_start, window_end).
+    """Return staff_id's non-cancelled bookings whose start_time falls in
+    [window_start, window_end).
 
     Ordered by start_time. Used by the FR-26 conflict-check mechanism
-    (app.domain.conflicts.check_conflicts).
+    (app.domain.conflicts.check_conflicts). A cancelled booking is excluded
+    so a freed slot immediately reads as unoccupied here (FR-11).
     """
     stmt = (
         select(Booking)
@@ -25,6 +28,7 @@ async def get_bookings_for_staff_in_window(
             Booking.staff_id == staff_id,
             Booking.start_time >= window_start,
             Booking.start_time < window_end,
+            Booking.status != "cancelled",
         )
         .order_by(Booking.start_time)
     )
@@ -52,6 +56,44 @@ async def get_bookings_with_staff_for_customer(
     )
     result = await db.execute(stmt)
     return [(booking, staff_name) for booking, staff_name in result.all()]
+
+
+async def list_bookings_with_names_in_window(
+    db: AsyncSession,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[tuple[Booking, str, str]]:
+    """Return every salon-wide, non-cancelled booking in [window_start, window_end),
+    each paired with its staff's name and its customer's name.
+
+    The Dashboard-wide equivalent of ``get_bookings_with_staff_for_customer``:
+    mirrors that function's Staff join shape exactly, but adds a ``Customer``
+    join (for FR-20's "customer name" column) and filters by a
+    ``[window_start, window_end)`` window instead of a single ``customer_id``
+    — there is no per-customer restriction here, since this is the
+    Dashboard's own salon-wide view, not a Customer's own history. A
+    cancelled booking is excluded, matching
+    ``get_bookings_for_staff_in_window``'s existing convention (FR-11: a
+    freed slot immediately reads as unoccupied). Ordered by start_time so
+    the Dashboard's "today"/"week" bookings view reads chronologically.
+    """
+    stmt = (
+        select(Booking, Staff.name, Customer.name)
+        .join(Staff, Booking.staff_id == Staff.id)
+        .join(Customer, Booking.customer_id == Customer.id)
+        .where(
+            Booking.start_time >= window_start,
+            Booking.start_time < window_end,
+            Booking.status != "cancelled",
+        )
+        .order_by(Booking.start_time)
+    )
+    result = await db.execute(stmt)
+    return [
+        (booking, staff_name, customer_name)
+        for booking, staff_name, customer_name in result.all()
+    ]
 
 
 async def create_booking(

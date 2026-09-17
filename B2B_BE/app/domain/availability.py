@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,6 +118,26 @@ def _is_blocked_at(rows: Sequence[Availability], instant: datetime) -> bool:
     return latest.blocked
 
 
+async def is_staff_blocked_now(
+    db: AsyncSession, *, staff_id: int, now: datetime | None = None
+) -> bool:
+    """Whether staff_id is blocked right now (FR-19's Dashboard status pill).
+
+    A thin public wrapper: defaults ``now`` to ``datetime.now(UTC)``, fetches
+    that day's ``Availability`` rows via the existing
+    ``list_availability_for_staff_on_day``, and delegates to the existing
+    ``_is_blocked_at`` rule — so the Dashboard's status pill and FR-7's own
+    slot-search block resolution can never disagree (single source of truth,
+    not a second implementation of the same rule).
+    """
+    if now is None:
+        now = datetime.now(UTC)
+    rows = await list_availability_for_staff_on_day(
+        db, staff_id=staff_id, day=now.date()
+    )
+    return _is_blocked_at(rows, now)
+
+
 class OpenSlot(BaseModel):
     """A single open, bookable slot resolved for a day (FR-7)."""
 
@@ -184,13 +204,19 @@ def render_day_slot_list(day: date, slots: list[OpenSlot]) -> str:
     Falls back to a minimal literal message when ``slots`` is empty — the
     only zero-availability UX this ticket provides (see the plan's Out of
     Scope).
+
+    Renders as a numbered plain-text list with a trailing reply prompt, per
+    ``whatsapp-deltas.md`` §1's FR-7 example — this is a shared,
+    channel-agnostic renderer with no ``channel`` parameter, so both Web
+    Chat and WhatsApp get the same numbered format once wired.
     """
     formatted_day = day.strftime("%A, %B %d")
     if not slots:
         return f"Sorry, I don't have any open slots on {formatted_day}."
 
     lines = [f"Here are the open slots on {formatted_day}:"]
-    for slot in slots:
+    for index, slot in enumerate(slots, start=1):
         formatted_time = slot.start_time.strftime("%I:%M %p")
-        lines.append(f"- {formatted_time} with {slot.staff_name}")
+        lines.append(f"{index}) {formatted_time} with {slot.staff_name}")
+    lines.append("Reply with a number or a time.")
     return "\n".join(lines)

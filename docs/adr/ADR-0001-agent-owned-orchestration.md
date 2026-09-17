@@ -3,7 +3,8 @@
 ## Status
 
 Proposed / Experimental. Adopted for the AI development infrastructure of
-salon-app; not yet validated by real use.
+salon-app; not yet validated by real use. Amended 2026-09-18 to recognize
+Workflow Skills as a bounded exception — see **Amendment** below.
 
 ## Scope of this decision
 
@@ -53,6 +54,8 @@ Agent → Skill → Tool → Repository → Evidence → Handoff → Next Agent
 
 Simple work: `Agent → Skill → Tool → Evidence`.
 Complex work: a Lead delegating to Test, Developer and Reviewer.
+Named SDLC workflow work: a Workflow Skill delegating to the applicable Agent
+(see **Amendment** below).
 
 ### Agent responsibility
 
@@ -68,6 +71,8 @@ A skill owns one bounded, reusable capability: the procedural knowledge for how
 something is done. Skills describe capabilities, not workflows. A skill does not
 own the task lifecycle, does not decide which agent runs next, and does not chain
 other skills into a fixed sequence — that would make it a hidden workflow engine.
+This is the rule for **capability skills**. **Workflow skills** are a later,
+narrow exception to it — see **Amendment** below.
 
 ### Tool responsibility
 
@@ -140,7 +145,11 @@ repository.
 **2. Skill-owned orchestration.** Skills call each other in sequence. Rejected:
 this turns skills into hidden workflow engines, destroys their reusability
 (each becomes coupled to a specific flow), and scatters the "what happens next"
-decision across many components with no single owner.
+decision across many components with no single owner. *Amended 2026-09-18:* a
+narrow, bounded version of this alternative — one skill owning the sequence of
+exactly one named SDLC workflow, not skills chaining each other ad hoc — was
+later adopted; see **Amendment** below. Unbounded skill-owned orchestration for
+arbitrary skills remains rejected.
 
 **3. Large hierarchical agent systems.** Many specialised agents — per
 technology, per layer, per domain — under a deep coordinator tree. Rejected:
@@ -161,6 +170,27 @@ that holds the most information at the moment of the decision, while skills stay
 bounded and reusable, tools stay deterministic, and the risky parts — retries,
 scope, consequential actions — are constrained by explicit policy rather than by
 the agent's judgement alone.
+
+## Amendment (2026-09-18) — Workflow skills
+
+Real use produced four fixed, high-value SDLC pipelines — planning, development,
+unit testing, and QA — each with a stable, well-understood phase sequence and
+its own human gates. Encoding that known sequence once, in a dedicated skill, is
+cheaper and less error-prone than re-deriving it by agent judgement on every
+run, and there is one skill owner per pipeline rather than none.
+
+`sdlc-planning-workflow`, `sdlc-dev-workflow`, `sdlc-qa-workflow`, and
+`sdlc-unit-test-workflow` (`.claude/skills/<name>/SKILL.md`) are recognized as
+**workflow skills**: each owns the phase sequencing, agent invocation, and
+human gates for exactly one named workflow. This is narrower than Alternative 2
+above — it does not let arbitrary skills chain each other, only these four
+skills sequence their own one named pipeline. Full rules are normative in
+`.claude/STANDARDS.md` §2 ("Workflow skills").
+
+This does not change anything else in this ADR: capability skills remain
+bounded and non-orchestrating, agents still own orchestration for ad-hoc and
+cross-workflow work, and the `lead` agent does not participate in any of the
+four workflow skills' execution paths — none of their phases invoke it.
 
 ## Consequences
 

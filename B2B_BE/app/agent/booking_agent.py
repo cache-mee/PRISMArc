@@ -3,20 +3,32 @@
 Houses four independent pieces of Booking Agent behavior added by separate
 tickets:
 
-- ``handle_message`` — FR-1's identity-resolution gate (APPOINTMEN-14). The
-  one deterministic state machine implementing all three of FR-1's
-  acceptance criteria, per the UX spec
+- ``handle_message`` — FR-1's identity-resolution gate (APPOINTMEN-14),
+  extended by APPOINTMEN-48 to be channel-aware (FR-3) without forking any
+  logic per channel. The one deterministic state machine implementing all of
+  FR-1/FR-3's acceptance criteria, per the UX spec
   (`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/customer-booking-chat.md`
   §3.1):
 
   1. Before any booking/browse-history/cancel/reschedule action, the agent
-     always asks for a phone number first (AC1).
+     always asks for a phone number first — unless the calling channel
+     adapter already knows it (see ``phone_number`` below), in which case
+     that question is skipped entirely (AC1/FR-3).
   2. A phone number matching an existing ``Customer`` record greets the
      Customer by name and proceeds straight to the stated intent — no name
      question is ever asked (AC2).
-  3. A phone number with no match hands off to Story 1.3 (FR-2) — this
-     ticket only defines and calls that hand-off point, it does not
-     implement it (AC3).
+  3. A phone number with no match asks exactly one follow-up question (the
+     Customer's name); the next turn's ``message`` is taken as that name,
+     ``app.domain.customers.find_or_create_customer`` creates the
+     ``Customer`` record, and the session is marked resolved with the same
+     name-based greeting the known-number path uses (AC3).
+
+  ``phone_number`` is an optional, keyword-only parameter representing a
+  phone number the calling channel adapter already knows out-of-band (e.g.
+  WhatsApp's webhook sender). When supplied, identity resolution runs
+  against it immediately instead of asking for a number via ``message``.
+  When absent (Web Chat's call site, unchanged), ``message`` itself is
+  treated as the phone number once asked for, exactly as before.
 
   No real booking/browse/cancel/reschedule logic is implemented here (Epic
   2/3, out of scope) — once a session is resolved, this module returns a
@@ -93,6 +105,7 @@ from app.domain.availability import (
     render_day_slot_list,
 )
 from app.domain.booking_intent_verification import VerifiedBookingIntent
+from app.domain.customers import find_or_create_customer
 from app.domain.identity import resolve_customer_by_phone
 
 _logger = logging.getLogger(__name__)
@@ -103,54 +116,98 @@ _ALREADY_RESOLVED_PLACEHOLDER = "Got it — what would you like to do?"
 
 
 def hand_off_to_new_customer_flow(session_id: str, phone_number: str) -> None:
-    """Hand off an unresolved phone number to the new-customer flow.
+    """Mark that ``session_id`` has handed off to the new-customer flow.
 
-    Implemented by Story 1.3 (FR-2) — this ticket only defines the call
-    site. Story 1.3 owns the actual name-capture turn and ``Customer``
-    record creation; this stub deliberately does neither.
+    Originally a Story 1.3 (FR-2) stub; APPOINTMEN-48 implements the actual
+    name-capture turn and ``Customer`` record creation directly in
+    ``handle_message`` (the ``awaiting_name`` branch), alongside this call
+    rather than inside it. This function remains a harmless, side-effect-free
+    call site — e.g. for future observability hooks — and does not itself
+    perform any resolution.
     """
-    return None
+    return
 
 
-async def handle_message(db: AsyncSession, session_id: str, message: str | None) -> str:
+def _welcome_message(name: str) -> str:
+    """Render the shared post-resolution greeting for ``name``.
+
+    Used identically for the known-number path and the completed
+    unknown-number (name-capture) path, so both channels and both
+    resolution paths greet a Customer the same way.
+    """
+    return (
+        f"Welcome back, {name}! What can I help with — booking, "
+        "browsing services, or checking your appointments?"
+    )
+
+
+async def handle_message(
+    db: AsyncSession,
+    session_id: str,
+    message: str | None,
+    *,
+    phone_number: str | None = None,
+) -> str:
     """Run one Booking Agent turn for ``session_id``.
 
-    - No ``message`` (the opening turn) always returns the phone-number
-      prompt, without touching identity resolution (AC1).
     - Once the session is ``resolved``, the identity gate no longer applies
       and no further phone-number question is ever asked (AC2).
-    - Otherwise, ``message`` is treated as the phone number and resolved
-      against ``app.domain.identity.resolve_customer_by_phone``: a match
+    - If the session is mid-name-capture (``awaiting_name``), ``message`` is
+      treated as the Customer's name: ``find_or_create_customer`` creates the
+      ``Customer`` record, and the session is marked resolved with the same
+      greeting the known-number path uses (AC3).
+    - Otherwise, identity resolution needs a phone number:
+        - If the caller (a channel adapter) already knows it, pass it as the
+          keyword-only ``phone_number`` — the "ask for phone number" turn is
+          skipped entirely and resolution runs immediately against it
+          (WhatsApp; FR-3).
+        - If not (``phone_number`` is ``None``), no ``message`` yet means the
+          opening turn: return the phone-number prompt, without touching
+          identity resolution (AC1; Web Chat's unchanged behavior). Once
+          ``message`` arrives it is treated as the phone number.
+    - A resolved phone number matching an existing ``Customer`` record
       greets the Customer by name and marks the session resolved (AC2); no
-      match calls the ``hand_off_to_new_customer_flow`` stub and returns the
-      interim new-customer reply, without marking the session resolved
-      (AC3).
+      match asks exactly one follow-up question (the Customer's name),
+      setting ``awaiting_name`` so the next turn completes resolution (AC3).
     """
     state = session_store.get_or_create(session_id)
-
-    if message is None:
-        return _ASK_PHONE_NUMBER
 
     if state.resolved:
         return _ALREADY_RESOLVED_PLACEHOLDER
 
-    phone_number = message
-    customer = await resolve_customer_by_phone(db, phone_number)
+    if state.awaiting_name:
+        if message is None:
+            return _NEW_CUSTOMER_INTERIM
+        assert state.phone_number is not None
+        customer = await find_or_create_customer(db, state.phone_number, message)
+        state.customer_id = customer.id
+        state.customer_name = customer.name
+        state.resolved = True
+        state.awaiting_name = False
+        session_store.save(session_id, state)
+        return _welcome_message(customer.name)
+
+    if phone_number is None:
+        if message is None:
+            return _ASK_PHONE_NUMBER
+        resolved_phone_number = message
+    else:
+        resolved_phone_number = phone_number
+
+    customer = await resolve_customer_by_phone(db, resolved_phone_number)
 
     if customer is not None:
-        state.phone_number = phone_number
+        state.phone_number = resolved_phone_number
         state.customer_id = customer.id
         state.customer_name = customer.name
         state.resolved = True
         session_store.save(session_id, state)
-        return (
-            f"Welcome back, {customer.name}! What can I help with — booking, "
-            "browsing services, or checking your appointments?"
-        )
+        return _welcome_message(customer.name)
 
-    state.phone_number = phone_number
+    state.phone_number = resolved_phone_number
+    state.awaiting_name = True
     session_store.save(session_id, state)
-    hand_off_to_new_customer_flow(session_id, phone_number)
+    hand_off_to_new_customer_flow(session_id, resolved_phone_number)
     return _NEW_CUSTOMER_INTERIM
 
 

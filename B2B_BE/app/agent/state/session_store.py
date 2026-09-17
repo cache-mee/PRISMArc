@@ -14,6 +14,8 @@ Context* decision 5, and *Risks*. This is expected to be replaced by
 
 from dataclasses import dataclass
 
+from app.models.staff import StaffRole
+
 
 @dataclass
 class SessionState:
@@ -23,6 +25,16 @@ class SessionState:
     customer_id: int | None = None
     customer_name: str | None = None
     resolved: bool = False
+    awaiting_name: bool = False
+
+    # Staff/Owner (Manager Agent) resolution fields — additive only, added by
+    # APPOINTMEN-49 (WhatsApp Staff/Owner identity). All default so every
+    # existing customer-flow (``booking_agent``) call site and behavior is
+    # unaffected; see ``app.agent.manager_agent.resolve_and_greet_speaker``.
+    staff_id: int | None = None
+    staff_name: str | None = None
+    staff_role: StaffRole | None = None
+    manager_resolved: bool = False
 
 
 _sessions: dict[str, SessionState] = {}
