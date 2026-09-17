@@ -4,7 +4,7 @@
 Issue:  APPOINTMEN-9
 Branch: feature/APPOINTMEN-9-01-backend-project-scaffolding
 State:  complete
-Next:   None — SDLC journey complete. PR https://github.com/cache-mee/PRISMArc/pull/12 ready to merge.
+Next:   None — SDLC journey complete. PR merged into develop, ticket at Ready for UAT.
 
 | # | Step | Owner | Outcome | Evidence | At |
 |---|---|---|---|---|---|
@@ -17,3 +17,5 @@ Next:   None — SDLC journey complete. PR https://github.com/cache-mee/PRISMArc
 | 7 | [qa] Gate 2 — Integration Test Plan Approval | human | done | approved | 2026-09-17T10:45:11+00:00 |
 | 8 | [qa] Phase 3 — Write & Run Integration Tests | test | done | exit:0:pytest -v (1 passed, 1 skipped) | 2026-09-17T10:47:55+00:00 |
 | 9 | [qa] Phase 4 — QA Verdict | human | done | jira:transitioned:QA Done | 2026-09-17T10:49:22+00:00 |
+| 10 | [qa] Merge — PR #12 into develop | human | done | pr:https://github.com/cache-mee/PRISMArc/pull/12 (merged ee1722b) | 2026-09-17T11:34:41+00:00 |
+| 11 | [qa] Gate — Transition to terminal status | human | done | jira:transitioned:Ready for UAT | 2026-09-17T11:42:00+00:00 |

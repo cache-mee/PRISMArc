@@ -42,7 +42,7 @@
 
 | Ticket | Summary | Branch | PR | QA Verdict | Completed |
 |---|---|---|---|---|---|
-| APPOINTMEN-9 | 0.1 Backend project scaffolding | feature/APPOINTMEN-9-01-backend-project-scaffolding | [#12](https://github.com/cache-mee/PRISMArc/pull/12) — OPEN, targets `develop`, not yet merged | PASS (1/1 passed, 1 skipped — Docker build/network check not validated, Docker unavailable) | 2026-09-17 |
+| APPOINTMEN-9 | 0.1 Backend project scaffolding | feature/APPOINTMEN-9-01-backend-project-scaffolding | [#12](https://github.com/cache-mee/PRISMArc/pull/12) — MERGED into develop (ee1722b) | PASS (1/1 passed, 1 skipped — Docker build/network check not validated, Docker unavailable) | 2026-09-17 |
 | APPOINTMEN-10 | 0.2 Frontend project scaffolding | feature/APPOINTMEN-10-02-frontend-project-scaffolding | [#13](https://github.com/cache-mee/PRISMArc/pull/13) — MERGED into develop (a356f67) | PASS (17/19, 2 not validated — Docker build unverified) | 2026-09-17 |
 
 ---
