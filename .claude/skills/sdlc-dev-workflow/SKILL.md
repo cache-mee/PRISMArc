@@ -60,7 +60,9 @@ Schema: `.orchestration/schemas/run-record.md`.
   epic (`.orchestration/runs/planning-*/run-record.md`, check its Evidence rows for
   `created:{ticket}`), set `Task:` to that path.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
-  `[dev] Phase N — Name` (or `[dev] Gate N — Name`), `Owner` = `lead` (Phases 1–2) /
+  `[dev] Phase N — Name` (or `[dev] Gate N — Name`), `Owner` = `lead` (Phases 1–2 — this
+  workflow's own orchestrator acting directly, per Phase 1/2's "Owner: Orchestrator (this
+  workflow)" below; the `.claude/agents/lead.md` Lead Agent is never invoked by this workflow) /
   `developer` (Phases 3–4) / `reviewer` (Phase 6), or exactly `human` for a gate reply,
   `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` / `exit:<code>:<cmd>`
   / `jira:transitioned` / `pr:<url>` / `approved` as applicable, `At` = now, ISO-8601 — get the
