@@ -1,6 +1,6 @@
 ---
 name: test
-description: Owns test analysis, validation strategy, test design and deterministic test execution for salon-app. Turns acceptance criteria into executable checks and reports objective evidence rather than assertions of success.
+description: Owns test analysis, validation strategy, test design and deterministic test execution for the application. Turns acceptance criteria into executable checks and reports objective evidence rather than assertions of success.
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: inherit
 ---

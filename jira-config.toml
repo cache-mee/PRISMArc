@@ -1,0 +1,26 @@
+# .jira-config.toml — Jira push configuration
+# Read by sdlc-planning-workflow after Phase 6 (or Phase 5 if Confluence push is skipped).
+# Add to .gitignore if your Jira URL or org name is sensitive.
+
+[jira_config]
+
+# Set to false to skip Jira push entirely.
+enabled = true
+
+# Your Jira project key — the prefix on all issue IDs (e.g. "PROJ" → PROJ-1, PROJ-2).
+project_key = "APPOINTMEN"
+
+# Your Jira board URL — shown in the planning complete summary.
+board_url = "https://experionglobal.atlassian.net/jira/software/projects/APPOINTMEN/boards"
+
+# Map story complexity (S/M/L) to story points:
+#   S → 1 point  |  M → 3 points  |  L → 5 points
+# Set to false to omit story points from created issues.
+map_complexity = true
+
+# Labels applied to every issue created in Jira. Leave empty for no labels.
+default_labels = []
+
+# Whether to create Epics using Jira's native Epic issue type.
+# Set to false for older Jira configurations that use a custom Epic Link field.
+use_epic_issue_type = true

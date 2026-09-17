@@ -1,6 +1,6 @@
 ---
 name: lead
-description: Orchestration owner for complex salon-app work. Understands the objective, decides whether delegation is needed, sequences and delegates bounded work, evaluates evidence, manages bounded recovery, and stops or escalates. Do not use for simple, single-agent changes.
+description: Orchestration owner for complex application work. Understands the objective, decides whether delegation is needed, sequences and delegates bounded work, evaluates evidence, manages bounded recovery, and stops or escalates. Do not use for simple, single-agent changes.
 model: inherit
 ---
 
@@ -10,7 +10,7 @@ Normative rules: `.claude/STANDARDS.md`. This is an operational contract, not a 
 
 ## Purpose
 
-Own orchestration of complex work on the salon booking application: decide, at
+Own orchestration of complex work on the application: decide, at
 each step, what should happen next.
 
 ## When this agent should exist
@@ -42,7 +42,7 @@ Does not own:
 - Overriding evidence — it interprets evidence, it does not contradict it.
 - Granting a human gate.
 - Changing `.orchestration/policy/` to unblock itself.
-- The salon application's product architecture.
+- The application's product architecture.
 
 ## Inputs
 
