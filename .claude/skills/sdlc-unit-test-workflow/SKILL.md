@@ -13,7 +13,16 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
-- `{plans_dir}` resolves to `{project-root}/development/plans/`.
+- `{worktree_path}` is the isolated git worktree `sdlc-dev-workflow` Phase 2 created for
+  `{branch_name}` — resolve it via the `worktree-add` skill (idempotent; returns the existing path
+  rather than creating anything new), never via a plain `git checkout {branch_name}` in
+  `{project-root}`, which fails once the branch is already checked out in that worktree. Resolve
+  it **before** touching `{plans_dir}` — the plan file lives inside it (see below). Every
+  git/build/test command this workflow runs against the implemented code also runs from
+  `{worktree_path}`; `{run_dir}` stays anchored to `{project-root}` as above.
+- `{plans_dir}` resolves to `{worktree_path}/development/plans/`. `development/plans/` is
+  git-tracked, so the plan file committed by `sdlc-dev-workflow` Phase 3 travels with the branch
+  into this worktree.
 - `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md` — written by
   `sdlc-dev-workflow` Phase 3. This is the ticket's single source of truth (summary, acceptance
   criteria, tasks, affected files); there is no separate `ticket.md` anywhere.
@@ -89,8 +98,13 @@ Schema: `.orchestration/schemas/ticket-status.md`.
    On `detail`: read `{run_dir}/status.md` and present in full, then ask resume/restart.
    Wait for the user's reply.
 4. Update `{run_dir}/current.md` — set workflow to `sdlc-unit-test-workflow`, phase to `Phase 1 — Code Reconnaissance`, status to `running`.
-5. Read `{plan_file}` (`{plans_dir}/{ticket}-implementation-plan.md`) to understand what was built — it is the only ticket-context artefact `sdlc-dev-workflow` produces; there is no separate `ticket.md`.
-6. Confirm the branch is checked out: `git branch --show-current`. If not on `{branch_name}`, run `git checkout {branch_name}`.
+5. Resolve `{worktree_path}` for `{branch_name}` via the `worktree-add` skill
+   (`.claude/skills/worktree-add/SKILL.md`) — it returns the existing worktree rather than
+   recreating one. Confirm it: `git -C {worktree_path} branch --show-current` should print
+   `{branch_name}`. Do not run a plain `git checkout {branch_name}` in `{project-root}` — it fails
+   (or silently diverges) once the branch is checked out in the worktree. Resolve this **before**
+   step 6 — `{plan_file}` lives inside `{worktree_path}`.
+6. Read `{plan_file}` (`{plans_dir}/{ticket}-implementation-plan.md`) to understand what was built — it is the only ticket-context artefact `sdlc-dev-workflow` produces; there is no separate `ticket.md`.
 7. Begin at **Phase 1** (or the resume phase).
 
 ---
@@ -277,7 +291,9 @@ Reply with one of:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-Never run `git commit` or `git push` without the corresponding explicit reply.
+Run every `git log` / `git commit` / `git push` above from `{worktree_path}`, resolved in the
+On Activation step — never from `{project-root}`. Never run `git commit` or `git push` without the
+corresponding explicit reply.
 
 ---
 
