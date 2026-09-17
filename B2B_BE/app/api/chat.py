@@ -9,7 +9,7 @@ back into an HTTP response. All identity-resolution logic (FR-1) lives in
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent import booking_agent
 from app.database import get_db
@@ -27,6 +27,8 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
-    reply = booking_agent.handle_message(db, request.session_id, request.message)
+async def chat(
+    request: ChatRequest, db: AsyncSession = Depends(get_db)
+) -> ChatResponse:
+    reply = await booking_agent.handle_message(db, request.session_id, request.message)
     return ChatResponse(reply=reply)

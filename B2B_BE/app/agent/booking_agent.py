@@ -36,7 +36,7 @@ out-of-scope work (Epic 2/3).
 """
 
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.state import session_store
 from app.domain.appointments import ResolvedBookingCandidate, render_direct_confirmation
@@ -57,7 +57,7 @@ def hand_off_to_new_customer_flow(session_id: str, phone_number: str) -> None:
     return None
 
 
-def handle_message(db: Session, session_id: str, message: str | None) -> str:
+async def handle_message(db: AsyncSession, session_id: str, message: str | None) -> str:
     """Run one Booking Agent turn for ``session_id``.
 
     - No ``message`` (the opening turn) always returns the phone-number
@@ -80,7 +80,7 @@ def handle_message(db: Session, session_id: str, message: str | None) -> str:
         return _ALREADY_RESOLVED_PLACEHOLDER
 
     phone_number = message
-    customer = resolve_customer_by_phone(db, phone_number)
+    customer = await resolve_customer_by_phone(db, phone_number)
 
     if customer is not None:
         state.phone_number = phone_number

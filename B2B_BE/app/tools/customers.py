@@ -19,7 +19,9 @@ class CustomerRecord(BaseModel):
     name: str
 
 
-def identify_or_create_customer_tool(args: IdentifyOrCreateCustomerArgs) -> CustomerRecord:
+async def identify_or_create_customer_tool(
+    args: IdentifyOrCreateCustomerArgs,
+) -> CustomerRecord:
     """Identify an existing Customer by phone number, or create a new one.
 
     This is the in-process tool seam a future Booking Agent registers to
@@ -31,13 +33,10 @@ def identify_or_create_customer_tool(args: IdentifyOrCreateCustomerArgs) -> Cust
     Opens its own session via SessionLocal since this is an in-process,
     LLM-callable tool with no request-scoped session available to it.
     """
-    db = SessionLocal()
-    try:
-        customer = find_or_create_customer(db, args.phone_number, args.name)
+    async with SessionLocal() as db:
+        customer = await find_or_create_customer(db, args.phone_number, args.name)
         return CustomerRecord(
             id=customer.id,
             phone_number=customer.phone_number,
             name=customer.name,
         )
-    finally:
-        db.close()

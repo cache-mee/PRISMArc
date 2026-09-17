@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
 from app.repositories.bookings import create_booking
@@ -49,8 +49,8 @@ def render_direct_confirmation(candidate: ResolvedBookingCandidate) -> str:
     )
 
 
-def confirm_and_create_booking(
-    db: Session, prompt: "DirectConfirmationPrompt", *, customer_id: int
+async def confirm_and_create_booking(
+    db: AsyncSession, prompt: "DirectConfirmationPrompt", *, customer_id: int
 ) -> Booking:
     """Create a Booking row from a confirmed direct-confirmation prompt (FR-9).
 
@@ -77,13 +77,13 @@ def confirm_and_create_booking(
         )
 
     candidate = prompt.candidate
-    staff = get_staff_by_name(db, candidate.staff_name)
+    staff = await get_staff_by_name(db, candidate.staff_name)
     if staff is None:
         raise StaffNotFoundError(
             f"No Staff record found for staff_name={candidate.staff_name!r}."
         )
 
-    return create_booking(
+    return await create_booking(
         db,
         customer_id=customer_id,
         staff_id=staff.id,
