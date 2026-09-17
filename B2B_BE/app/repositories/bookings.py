@@ -1,13 +1,13 @@
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
 
 
-def get_bookings_for_staff_in_window(
-    db: Session,
+async def get_bookings_for_staff_in_window(
+    db: AsyncSession,
     *,
     staff_id: int,
     window_start: datetime,
@@ -27,11 +27,12 @@ def get_bookings_for_staff_in_window(
         )
         .order_by(Booking.start_time)
     )
-    return list(db.execute(stmt).scalars().all())
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
-def create_booking(
-    db: Session,
+async def create_booking(
+    db: AsyncSession,
     *,
     customer_id: int,
     staff_id: int,
@@ -51,6 +52,6 @@ def create_booking(
         status=status,
     )
     db.add(booking)
-    db.commit()
-    db.refresh(booking)
+    await db.commit()
+    await db.refresh(booking)
     return booking

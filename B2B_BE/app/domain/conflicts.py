@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.bookings import get_bookings_for_staff_in_window
 
@@ -26,8 +26,8 @@ class ConflictCheckResult(BaseModel):
     conflicting_bookings: list[ConflictingBooking]
 
 
-def check_conflicts(
-    db: Session,
+async def check_conflicts(
+    db: AsyncSession,
     *,
     staff_id: int,
     window_start: datetime,
@@ -41,7 +41,7 @@ def check_conflicts(
     start-time-in-window rather than a true interval overlap — an accepted
     scope boundary, not a true overlap check.
     """
-    bookings = get_bookings_for_staff_in_window(
+    bookings = await get_bookings_for_staff_in_window(
         db, staff_id=staff_id, window_start=window_start, window_end=window_end
     )
     conflicting = [

@@ -19,17 +19,14 @@ class StaffIdentity(BaseModel):
     role: StaffRole
 
 
-def resolve_staff_identity(phone_number: str) -> StaffIdentity | None:
+async def resolve_staff_identity(phone_number: str) -> StaffIdentity | None:
     """Resolve a phone number to a Staff identity, or None if no match.
 
     Opens its own session via SessionLocal since this is an in-process,
     LLM-callable tool with no request-scoped session available to it.
     """
-    db = SessionLocal()
-    try:
-        staff = get_staff_by_phone_number(db, phone_number)
+    async with SessionLocal() as db:
+        staff = await get_staff_by_phone_number(db, phone_number)
         if staff is None:
             return None
         return StaffIdentity(id=staff.id, name=staff.name, role=staff.role)
-    finally:
-        db.close()

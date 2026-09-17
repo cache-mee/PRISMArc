@@ -1,14 +1,18 @@
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.staff import Staff
 
 
-def get_staff_by_phone_number(db: Session, phone_number: str) -> Staff | None:
+async def get_staff_by_phone_number(
+    db: AsyncSession, phone_number: str
+) -> Staff | None:
     """Look up a Staff record by its exact, unique phone number."""
-    return db.query(Staff).filter(Staff.phone_number == phone_number).one_or_none()
+    result = await db.execute(select(Staff).where(Staff.phone_number == phone_number))
+    return result.scalar_one_or_none()
 
 
-def get_staff_by_name(db: Session, name: str) -> Staff | None:
+async def get_staff_by_name(db: AsyncSession, name: str) -> Staff | None:
     """Look up a Staff record by its exact name.
 
     Mirrors ``get_staff_by_phone_number``. ``name`` is not guaranteed unique
@@ -17,4 +21,5 @@ def get_staff_by_name(db: Session, name: str) -> Staff | None:
     scope of resolving ``ResolvedBookingCandidate.staff_name`` to a
     ``staff_id``.
     """
-    return db.query(Staff).filter(Staff.name == name).first()
+    result = await db.execute(select(Staff).where(Staff.name == name).limit(1))
+    return result.scalar_one_or_none()
