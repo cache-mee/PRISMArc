@@ -79,13 +79,16 @@ class ResolvedBookingCandidate(BaseModel):
 def render_direct_confirmation(candidate: ResolvedBookingCandidate) -> str:
     """Render the FR-6 direct-confirmation message for a resolved candidate.
 
-    Names the service, date/time, and assigned staff, and explicitly asks
-    the Customer to confirm before any Booking is created.
+    Names the service, date/time, and assigned staff, and asks the Customer
+    to confirm before any Booking is created via an explicit yes/no
+    question, per ``whatsapp-deltas.md`` §1's FR-9 example. This is a
+    shared, channel-agnostic renderer with no ``channel`` parameter, also
+    reused as the confirm-step prompt by ``reschedule_booking`` (FR-12).
     """
     formatted_time = candidate.start_time.strftime("%A, %B %d at %I:%M %p")
     return (
         f"I can book {candidate.service_name} with {candidate.staff_name} on "
-        f"{formatted_time}. Shall I go ahead and confirm this booking?"
+        f"{formatted_time} — reply YES to confirm or NO to change it."
     )
 
 
