@@ -1,5 +1,5 @@
 workflow: sdlc-dev-workflow
-phase: Phase 6 — Code Review handoff
-status: handed-off
-waiting: new session: /sdlc-dev-workflow review APPOINTMEN-55
-next: Run the review command above in a new Claude Code session
+phase: complete
+status: done
+waiting: n/a
+next: n/a — PR #64 merged, Jira Ready for UAT, unit-test/QA workflows skipped per user override
