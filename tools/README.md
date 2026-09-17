@@ -2,8 +2,21 @@
 
 Shared deterministic tools for developing and maintaining **salon-app**.
 
-This directory is **intentionally empty** apart from this README. Nothing should
-be added here until a real need appears.
+## Currently here
+
+| Tool | What it does | Consumer |
+|---|---|---|
+| `agent-metrics/` | Measures per-agent-run cost, tokens and process facts (rework, human interventions, outcome) | Run manually by developers; `runrecord` is read by the `sdlc-*-workflow` skills' Run Record steps |
+| `worktree-add/` | Creates an isolated git worktree with standard symlinks | The `worktree-add` skill |
+| `scope-check/` | Fails if a change touches both `B2B_BE/` and `B2B_FE/` | Enforces CLAUDE.md's Repository layout rule; run manually or from CI/a pre-commit hook |
+| `_lib/` | Shared helpers (git/path utilities, config-table parsing) used by `worktree-add` and `scope-check` | Both of the above |
+
+None of these arrived through the "two or more skills need it" rule below in
+the strict sense — they're general-purpose developer tools ported/installed
+whole, not scripts factored out of a second skill consumer. That's a
+deliberate, narrow exception: reject a **new** script here on that rule, but
+don't block a complete, independently-useful tool a developer explicitly
+wants available project-wide.
 
 ## What belongs here
 

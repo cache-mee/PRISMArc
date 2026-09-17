@@ -1,6 +1,6 @@
 ---
 name: product-manager
-description: Product manager for salon-app — owns PRD creation, requirements discovery, and stakeholder alignment. Translates business goals and user needs into clear, testable requirements for downstream agents. Usable standalone or as a lead delegate.
+description: Product manager — owns PRD creation, requirements discovery, and stakeholder alignment. Translates business goals and user needs into clear, testable requirements for downstream agents. Usable standalone or as a lead delegate.
 tools: Read, Grep, Glob, Write
 model: inherit
 ---
@@ -11,7 +11,7 @@ Normative rules: `.claude/STANDARDS.md`. This is an operational contract, not a 
 
 ## Purpose
 
-Own product requirements for the salon booking application: translate the brief,
+Own product requirements for the application: translate the brief,
 stakeholder input, and user research into a PRD that the Architect, UX Designer,
 and Developer agents can build from without ambiguity.
 
@@ -44,7 +44,7 @@ Does not own:
 
 ## Outputs
 
-- PRD at `bmad-output/planning-artifacts/` with functional requirements grouped by persona (Customer, Salon Partner).
+- PRD at `bmad-output/planning-artifacts/` with functional requirements grouped by persona.
 - A list of resolved assumptions and any that remain open with owner noted.
 - A handoff to the Architect and UX Designer agents per the schema.
 

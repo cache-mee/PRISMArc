@@ -234,6 +234,7 @@ On `stop`, delete `{plan_file}` if the user requests cleanup, then halt.
 **Owner:** Developer agent (`.claude/agents/developer.md`)
 **Skills:** `bmad-build` (primary — use for each task); escalate to `bmad-build-auto` only for fully autonomous sub-tasks explicitly noted as such in the plan
 **Input:** Approved `{plan_file}` + `stack/rules/base-rules.md` + `stack/rules/client-rules.md`
+**Also runs:** `tools/scope-check/` — mechanical check of CLAUDE.md's Repository layout rule, before the push gate
 
 ### Instructions
 
@@ -244,7 +245,18 @@ On `stop`, delete `{plan_file}` if the user requests cleanup, then halt.
    - Runs available lint/test commands (from `CLAUDE.md` stack table or discovered from CI config) after each task.
    - After each task is complete, present the **commit message gate** (see below) before committing.
    - If a task fails after one retry, the Developer agent stops and escalates — it does not skip or silently continue.
-3. After all tasks are committed, present the **push gate** (see below) before pushing.
+3. After all tasks are committed, run:
+   ```
+   tools/scope-check/scope-check --base {default_branch} --head {branch_name}
+   ```
+   - **Exit 0 (PASS):** continue to the push gate.
+   - **Exit 1 (FAIL):** stop. Do not present the push gate, do not push, do not proceed to
+     Phase 5. Report scope-check's output verbatim (it names the backend and frontend files
+     separately) and tell the user this ticket must be split into two bounded changes, one per
+     folder, per CLAUDE.md's Repository layout rule. This is a stop condition — the Developer
+     agent does not attempt to split the change itself; that is a re-planning decision for the
+     user, back at Phase 3.
+4. After scope-check passes, present the **push gate** (see below) before pushing.
 
 ### Commit Message Gate (after every task)
 
@@ -364,14 +376,18 @@ development/plans/{ticket}-review.md with a PASS or FAIL verdict.
 
 1. Read `{plan_file}`. If not found, ask the user for the path.
 2. Get the PR diff: `gh pr diff` (detect PR from branch) or `git diff {default_branch}...{branch_name}`.
-3. Load the review template from `.claude/skills/sdlc-dev-workflow/templates/review-template.md`.
-4. Invoke the Reviewer agent with plan + diff as input.
-5. The Reviewer agent:
+3. Run `tools/scope-check/scope-check --base {default_branch} --head {branch_name}` independently
+   — do not trust that Phase 4's check still holds; commits may have been added since. A FAIL
+   here is a CRITICAL finding regardless of anything else in the diff, and forces the overall
+   verdict to **FAIL** — per CLAUDE.md's Repository layout rule, there is no override.
+4. Load the review template from `.claude/skills/sdlc-dev-workflow/templates/review-template.md`.
+5. Invoke the Reviewer agent with plan + diff + scope-check result as input.
+6. The Reviewer agent:
    - Inspects the diff against every acceptance criterion in the plan before drawing conclusions.
    - Completes every section of the review template. No section may be left blank.
    - Returns an explicit **PASS** or **FAIL** verdict in the Summary section.
-6. Save the completed review to `{review_file}`.
-7. Present the verdict to the user.
+7. Save the completed review to `{review_file}`.
+8. Present the verdict to the user.
 
 ### On FAIL
 
@@ -453,6 +469,9 @@ The Developer agent MUST NOT invoke `bmad-quick-dev` (deprecated), `bmad-dev-sto
 - A required source file or artefact does not exist on disk.
 - The Developer agent exhausts its retry limit without producing output.
 - A lint or test run fails after one retry.
+- `tools/scope-check/` reports a violation (the change touches both `B2B_BE/` and
+  `B2B_FE/`) — resolved only by re-planning the ticket as two bounded changes, never by
+  overriding the check.
 - A human decision is required that no agent can make.
 
 On any stop: tell the user exactly where things stand and what command to run to resume. The plan file at `{plan_file}` preserves all context needed to continue in a future session.
