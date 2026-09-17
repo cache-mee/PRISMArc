@@ -39,10 +39,16 @@ async def create_booking(
     service_name: str,
     start_time: datetime,
     status: str = "confirmed",
+    commit: bool = True,
 ) -> Booking:
     """Insert a new Booking row and return it.
 
     This is the sole insert path for a Booking row in the codebase.
+
+    When ``commit`` is ``True`` (default), commits and refreshes the row
+    immediately — the exact prior behavior. When ``False``, only flushes
+    (still assigning the row's autoincrement ``id``), leaving the
+    transaction open for a caller composing multiple writes.
     """
     booking = Booking(
         customer_id=customer_id,
@@ -52,6 +58,34 @@ async def create_booking(
         status=status,
     )
     db.add(booking)
-    await db.commit()
-    await db.refresh(booking)
+    if commit:
+        await db.commit()
+        await db.refresh(booking)
+    else:
+        await db.flush()
+    return booking
+
+
+async def get_booking_by_id(db: AsyncSession, booking_id: int) -> Booking | None:
+    """Return the Booking row matching booking_id, or None if not found."""
+    stmt = select(Booking).where(Booking.id == booking_id)
+    result = await db.execute(stmt)
+    return result.scalars().first()
+
+
+async def set_booking_status(
+    db: AsyncSession, booking: Booking, status: str, *, commit: bool = True
+) -> Booking:
+    """Set an already-fetched Booking's status field.
+
+    When ``commit`` is ``True`` (default), commits and refreshes the row
+    immediately. When ``False``, only flushes, leaving the transaction open
+    for a caller composing multiple writes.
+    """
+    booking.status = status
+    if commit:
+        await db.commit()
+        await db.refresh(booking)
+    else:
+        await db.flush()
     return booking
