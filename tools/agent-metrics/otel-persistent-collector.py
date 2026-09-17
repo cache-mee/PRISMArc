@@ -121,7 +121,10 @@ class Ledger:
             for name, res_attrs, attrs, val, temporality in otlp_points(payload):
                 if name not in (COST_METRIC, TOKEN_METRIC):
                     continue
-                session = res_attrs.get("session.id") or "unknown"
+                # Claude Code has been observed sending session.id as a metric data-point
+                # attribute rather than an OTLP resource attribute; check both rather than
+                # assuming the spec-preferred location is the one actually used.
+                session = res_attrs.get("session.id") or attrs.get("session.id") or "unknown"
                 key = (session, name, tuple(sorted(attrs.items())))
                 if temporality == CUMULATIVE:
                     delta = val - self.seen.get(key, 0.0)
@@ -299,6 +302,14 @@ def self_test() -> int:
         rows = [json.loads(l) for l in lines]
         check("session id carried from resource attributes",
               {r["session"] for r in rows} == {"sess-a", "sess-b"})
+
+        n2b = ledger.ingest(_body([
+            (COST_METRIC, {"model": "opus-5", "query_source": "main",
+                           "session.id": "sess-c"}, 0.2)]))
+        check("session id also carried from a data-point attribute", n2b == 1)
+        rows_after = [json.loads(l) for l in out.read_text(encoding="utf-8").splitlines()]
+        check("data-point session id reached the row",
+              any(r["session"] == "sess-c" for r in rows_after))
 
         # DELTA export from the same session ADDS, not replaces.
         ledger.ingest(_body([(COST_METRIC, {"model": "opus-5", "query_source": "subagent",

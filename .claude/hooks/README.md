@@ -20,7 +20,7 @@ independent of any agent's judgement.
 | File | When it runs | What it does |
 |------|--------------|--------------|
 | `secret-leak-guard.py` | Before Claude runs a Bash command | Blocks commands that paste the raw value of an env var whose name looks like a secret (`*TOKEN*`, `*KEY*`, `*SECRET*`, `*PASSWORD*`, `*PAT*`, `*PRIVATE*`); tells Claude to use `$VAR_NAME` instead so only the variable name is ever displayed |
-| `gate-guard.py` | Before Claude runs a Bash command | Mechanically enforces the Bash-detectable subset of `.orchestration/policy/gates.json` — blocks `merge`, `push-to-shared-branch`, `destructive-operation`, `release`, and `dependency-change` commands rather than relying on an agent to recognise and stop at the gate itself |
+| `gate-guard.py` | Before Claude runs a Bash command | Mechanically enforces the Bash-detectable subset of `.orchestration/policy/gates.json` — blocks `merge`, `push-to-shared-branch`, `destructive-operation`, `release`, and `dependency-change` commands rather than relying on an agent to recognise and stop at the gate itself. `destructive-operation` also covers AWS resource deletion (`ec2 terminate-instances`/`delete-security-group`/`delete-key-pair`, `s3 rb`/`rm --recursive`, `s3api delete-bucket`, `cloudfront delete-distribution`, `rds delete-db-instance`/`delete-db-cluster`) for the Deploy agent's `aws` environment — see `.claude/agents/deploy.md` |
 
 `tools/policy-guard/` is a related but separate control, wired as a
 `Write`/`Edit` `PreToolUse` hook rather than living in this folder — see
