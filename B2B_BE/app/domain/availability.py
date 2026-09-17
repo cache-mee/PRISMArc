@@ -6,8 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.appointments import StaffNotFoundError
 from app.models.availability import Availability
-from app.repositories.availability import create_availability
-from app.repositories.staff_repository import get_staff_by_name
+from app.models.staff import StaffRole
+from app.repositories.availability import (
+    create_availability,
+    list_availability_for_staff_on_day,
+)
+from app.repositories.bookings import list_confirmed_bookings_for_staff_on_day
+from app.repositories.staff_repository import get_staff_by_name, list_bookable_staff
 
 # FR-7 slot grid (Technical Context assumption #1): a fixed salon-operating-
 # hours window and slot granularity, since no working-hours/slot-duration
@@ -111,3 +116,81 @@ def _is_blocked_at(rows: Sequence[Availability], instant: datetime) -> bool:
         return False
     latest = max(covering, key=lambda row: row.created_at)
     return latest.blocked
+
+
+class OpenSlot(BaseModel):
+    """A single open, bookable slot resolved for a day (FR-7)."""
+
+    staff_name: str
+    start_time: datetime
+
+
+async def list_open_slots_for_day(
+    db: AsyncSession, day: date, staff_name: str | None = None
+) -> list[OpenSlot]:
+    """List every currently-open, bookable slot on ``day`` (FR-7).
+
+    Resolves candidate staff first: a stated ``staff_name`` is looked up via
+    ``get_staff_by_name`` and restricted to ``StaffRole.STAFF``, raising the
+    existing ``StaffNotFoundError`` (``app.domain.appointments``, reused the
+    same way FR-27's ``confirm_and_apply_availability_change`` already does)
+    if unmatched or not bookable; with no ``staff_name`` stated, every
+    bookable staff member (``list_bookable_staff``) is a candidate.
+
+    For each candidate staff member, builds the day's slot grid
+    (``_generate_slot_grid``), excludes any slot blocked per
+    ``_is_blocked_at`` against that staff's ``Availability`` rows, and
+    excludes any slot matching a confirmed ``Booking``'s exact
+    ``start_time``. The remaining slots are returned sorted by
+    ``start_time`` then ``staff_name``.
+    """
+    if staff_name is not None:
+        staff = await get_staff_by_name(db, staff_name)
+        if staff is None or staff.role != StaffRole.STAFF:
+            raise StaffNotFoundError(
+                f"No bookable Staff record found for staff_name={staff_name!r}."
+            )
+        candidate_staff = [staff]
+    else:
+        candidate_staff = await list_bookable_staff(db)
+
+    grid = _generate_slot_grid(day)
+    open_slots: list[OpenSlot] = []
+    for staff in candidate_staff:
+        availability_rows = await list_availability_for_staff_on_day(
+            db, staff_id=staff.id, day=day
+        )
+        confirmed_bookings = await list_confirmed_bookings_for_staff_on_day(
+            db, staff_id=staff.id, day=day
+        )
+        booked_start_times = {booking.start_time for booking in confirmed_bookings}
+
+        for slot in grid:
+            if _is_blocked_at(availability_rows, slot):
+                continue
+            if slot in booked_start_times:
+                continue
+            open_slots.append(OpenSlot(staff_name=staff.name, start_time=slot))
+
+    open_slots.sort(key=lambda slot: (slot.start_time, slot.staff_name))
+    return open_slots
+
+
+def render_day_slot_list(day: date, slots: list[OpenSlot]) -> str:
+    """Render the FR-7 Customer-facing listing of a day's open slots.
+
+    Mirrors ``render_direct_confirmation``'s shape (``app.domain.appointments``):
+    a plain, ready-to-send string naming the day and each slot's time/staff.
+    Falls back to a minimal literal message when ``slots`` is empty — the
+    only zero-availability UX this ticket provides (see the plan's Out of
+    Scope).
+    """
+    formatted_day = day.strftime("%A, %B %d")
+    if not slots:
+        return f"Sorry, I don't have any open slots on {formatted_day}."
+
+    lines = [f"Here are the open slots on {formatted_day}:"]
+    for slot in slots:
+        formatted_time = slot.start_time.strftime("%I:%M %p")
+        lines.append(f"- {formatted_time} with {slot.staff_name}")
+    return "\n".join(lines)
