@@ -1,3 +1,17 @@
+"""Manager Agent turn logic.
+
+Houses the Manager Agent stub built by APPOINTMEN-17 (FR-24, Staff identity
+resolution) — ``SpeakerContext``, ``resolve_speaker``, ``describe_speaker``,
+and ``build_proposed_availability_change`` — plus one addition by APPOINTMEN-16
+(FR-14, Owner/Admin identity resolution):
+
+- ``render_identity_greeting`` — the role-differentiated opening line the UX
+  spec (`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/staff-owner-manager-chat.md`
+  §2) defines for a resolved ``SpeakerContext``: one line for Owner/Admin,
+  one for Staff. It is additive alongside ``describe_speaker`` (left
+  unchanged, per APPOINTMEN-17), not a replacement for it.
+"""
+
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -10,6 +24,11 @@ from app.tools.staff import resolve_staff_identity
 _ROLE_LABELS: dict[StaffRole, str] = {
     StaffRole.OWNER_ADMIN: "Owner/Admin",
     StaffRole.STAFF: "Staff",
+}
+
+_ROLE_GREETINGS: dict[StaffRole, str] = {
+    StaffRole.OWNER_ADMIN: "Hi {name}! Want to update the service catalog?",
+    StaffRole.STAFF: "Hi {name}! Want to update your availability?",
 }
 
 
@@ -38,6 +57,21 @@ def describe_speaker(context: SpeakerContext) -> str:
     """Render an unambiguous statement of which Staff member is speaking."""
     role_label = _ROLE_LABELS[context.role]
     return f"Recognized as {context.name} ({role_label})."
+
+
+def render_identity_greeting(context: SpeakerContext) -> str:
+    """Render the role-differentiated opening line for a resolved speaker (FR-14).
+
+    This is the hook point a future conversational Manager Agent loop calls
+    immediately after ``resolve_speaker`` returns a match, in place of (or
+    alongside) ``describe_speaker``, to produce the actual role-specific
+    greeting the UX spec (§2) defines: Owner/Admin is asked about the service
+    catalog, Staff is asked about their availability. It performs no I/O and
+    does not itself grant any permission — enforcing what a role may actually
+    do remains out of scope here, as it was for ``describe_speaker``.
+    """
+    template = _ROLE_GREETINGS[context.role]
+    return template.format(name=context.name)
 
 
 def build_proposed_availability_change(
