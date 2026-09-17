@@ -43,12 +43,29 @@ by ``app.tools.availability_change.propose_availability_change`` (the
 LLM-callable tool that builds the pending change and stores it on the
 session), ahead of ``app.tools.availability_change.confirm_availability_change``
 ever calling ``confirm_and_apply_availability_change``.
+
+APPOINTMEN-55 Task 6 also adds ``run_manager_turn`` and its ``dispatch_tool``
+helper — the ticket's core deliverable, the bounded tool-calling loop that
+sends the resolved speaker's message plus session history to the
+``LLMProvider`` (``app.agent.providers.base``), dispatches any tool calls the
+model makes through the role-scoped registry
+(``app.agent.tool_registry.get_tools_for_role``, Task 4), and feeds each
+tool's JSON result back to the model — capped at ``_MAX_TOOL_ITERATIONS``
+rounds (a bounded ``for``/``else`` loop, never an unbounded ``while True``) so
+a model that keeps calling tools can never hang the turn. ``get_tools_for_role``,
+``render_manager_agent_system_prompt`` (Task 5), and ``LiteLLMProvider`` are
+imported locally inside these two functions rather than at module level:
+``app.agent.tool_registry`` and ``app.agent.prompts.manager_agent_prompt`` both
+import ``SpeakerContext`` from this module, so a module-level import back into
+either would be a circular import.
 """
 
+import json
 import logging
 from datetime import datetime
 
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.availability_intent import parse_availability_change
 from app.agent.catalog_intent import is_catalog_change_request
@@ -364,3 +381,134 @@ def respond_to_owner_admin_availability_request(speaker: SpeakerContext) -> str 
     returns ``None`` when the request should proceed (Staff).
     """
     return decline_owner_admin_own_availability_request(speaker.role)
+
+
+_MAX_TOOL_ITERATIONS = 6
+"""Bounded-loop safety valve for ``run_manager_turn``: the maximum number of
+``LLMProvider.generate`` rounds a single turn will run before giving up on the
+model ever stopping its own tool-calling, per the ticket's explicit "never an
+unbounded while True" requirement.
+"""
+
+_TOOL_LOOP_CAP_REACHED_MESSAGE = (
+    "I've made several tool calls trying to help with this and want to check in "
+    "before continuing — could you tell me what you'd like me to do next?"
+)
+"""Returned by ``run_manager_turn`` when the model is still calling tools after
+``_MAX_TOOL_ITERATIONS`` rounds — the bounded-loop safety valve's user-visible
+message, in place of ever hanging the turn or raising.
+"""
+
+_EMPTY_REPLY_FALLBACK = (
+    "I don't have anything further to add on that — is there anything else I can help with?"
+)
+"""Returned by ``run_manager_turn`` when the model stops calling tools but its
+final response has no text (``response.text`` is ``None``/empty), so a turn
+never returns an empty string to the speaker.
+"""
+
+
+async def dispatch_tool(
+    name: str,
+    args: dict,
+    *,
+    db: AsyncSession | None,
+    session_id: str,
+    speaker: SpeakerContext,
+) -> dict:
+    """Dispatch one model-issued tool call to its role-scoped ``ToolSpec.dispatch`` (Task 6).
+
+    Looks up ``name`` only within ``get_tools_for_role(speaker.role)``
+    (``app.agent.tool_registry``, Task 4) — never the full universe of tools
+    registered across both roles — so a hallucinated tool name, or a tool that
+    exists but belongs to the *other* role's registry (e.g. an Owner/Admin
+    session naming ``propose_availability_change``, which FR-21 excludes from
+    ``OWNER_ADMIN_TOOLS``), cannot execute. Returns a clear
+    ``tool_not_available`` error result fed back to the model instead of
+    raising, so one bad tool call from the model never crashes the loop.
+
+    ``get_tools_for_role`` is imported locally rather than at module level:
+    ``app.agent.tool_registry`` imports ``SpeakerContext`` from this module, so
+    a module-level import back into it here would be a circular import.
+    """
+    from app.agent.tool_registry import get_tools_for_role
+
+    for tool in get_tools_for_role(speaker.role):
+        if tool.name == name:
+            return await tool.dispatch(db=db, session_id=session_id, speaker=speaker, args=args)
+    return {
+        "error": "tool_not_available",
+        "message": f"Tool {name!r} is not available for this role.",
+    }
+
+
+async def run_manager_turn(
+    db: AsyncSession | None, session_id: str, speaker: SpeakerContext, message: str
+) -> str:
+    """Run one bounded tool-calling turn of the Manager Agent conversational loop (FR-25/FR-27).
+
+    The ticket's core deliverable. Appends ``message`` to the session's saved
+    ``state.history`` (Task 1) and repeatedly calls ``LLMProvider.generate``
+    (``app.agent.providers.base``) — system prompt from
+    ``render_manager_agent_system_prompt`` (Task 5), tools from
+    ``get_tools_for_role(speaker.role)`` (Task 4) — dispatching every tool call
+    the model makes via ``dispatch_tool`` and feeding each JSON result back
+    into the message list as a ``role: "tool"`` entry, until the model stops
+    calling tools or ``_MAX_TOOL_ITERATIONS`` rounds are reached (a bounded
+    ``for``/``else`` loop, never an unbounded ``while True``).
+
+    Every provider turn's ``response.raw_message`` — not only turns that call a
+    tool — is appended to the running ``messages`` list before checking whether
+    the model called a tool, so ``state.history`` always ends with a
+    well-formed transcript (the assistant's own reply is part of the history
+    the *next* call to ``run_manager_turn`` builds on, exactly like every
+    ``role: "tool"`` entry already is). ``state.history`` is saved via
+    ``session_store.save`` on every exit path — the normal reply path and the
+    bounded-loop cap — so a capped turn's tool-call/tool-result history is
+    never silently dropped.
+
+    ``get_tools_for_role``, ``render_manager_agent_system_prompt``, and
+    ``LiteLLMProvider`` are imported locally rather than at module level, for
+    the same circular-import reason documented on ``dispatch_tool`` (and
+    because ``app.agent.prompts.manager_agent_prompt`` also imports
+    ``SpeakerContext`` from this module). ``LiteLLMProvider`` is constructed
+    the same way ``app.agent.availability_intent.parse_availability_change``
+    already does: inline, from ``settings.llm_model``/``settings.llm_api_key``.
+    """
+    from app.agent.prompts.manager_agent_prompt import (
+        render_manager_agent_system_prompt,
+    )
+    from app.agent.providers.litellm_provider import LiteLLMProvider
+    from app.agent.tool_registry import get_tools_for_role
+    from app.config import settings
+
+    state = session_store.get_or_create(session_id)
+    messages = state.history + [{"role": "user", "content": message}]
+    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    system = render_manager_agent_system_prompt(speaker)
+    tools = [tool.schema for tool in get_tools_for_role(speaker.role)]
+
+    for _ in range(_MAX_TOOL_ITERATIONS):
+        response = await provider.generate(system=system, messages=messages, tools=tools)
+        messages.append(response.raw_message)
+        if not response.tool_calls:
+            break
+        for call in response.tool_calls:
+            result = await dispatch_tool(
+                call.name, call.args, db=db, session_id=session_id, speaker=speaker
+            )
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": json.dumps(result, default=str),
+                }
+            )
+    else:
+        state.history = messages
+        session_store.save(session_id, state)
+        return _TOOL_LOOP_CAP_REACHED_MESSAGE
+
+    state.history = messages
+    session_store.save(session_id, state)
+    return response.text or _EMPTY_REPLY_FALLBACK
