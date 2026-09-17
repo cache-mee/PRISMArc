@@ -1,5 +1,5 @@
 workflow: sdlc-dev-workflow
-phase: Gate 3 — Plan Review
+phase: Phase 6 — Code Review
 status: waiting
-waiting: user reply — implement / revise / stop
-next: Present plan summary and Gate 3 to the user
+waiting: new session: /sdlc-dev-workflow review APPOINTMEN-16
+next: Reviewer agent reads plan + PR #30 diff, produces development/plans/APPOINTMEN-16-review.md
