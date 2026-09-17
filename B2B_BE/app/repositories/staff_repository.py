@@ -1,7 +1,19 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.staff import Staff
+from app.models.staff import Staff, StaffRole
+
+
+async def list_bookable_staff(db: AsyncSession) -> list[Staff]:
+    """Staff a Customer can book — excludes the Owner/Admin (AC3)."""
+    result = await db.execute(select(Staff).where(Staff.role != StaffRole.OWNER_ADMIN))
+    return list(result.scalars().all())
+
+
+async def list_dashboard_staff(db: AsyncSession) -> list[Staff]:
+    """Staff shown on the Dashboard's staff list — excludes the Owner/Admin (AC3)."""
+    result = await db.execute(select(Staff).where(Staff.role != StaffRole.OWNER_ADMIN))
+    return list(result.scalars().all())
 
 
 async def get_staff_by_phone_number(

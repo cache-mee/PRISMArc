@@ -1,8 +1,34 @@
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.booking import Booking
+
+
+async def get_bookings_for_staff_in_window(
+    db: AsyncSession,
+    *,
+    staff_id: int,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[Booking]:
+    """Return staff_id's bookings whose start_time falls in [window_start, window_end).
+
+    Ordered by start_time. Used by the FR-26 conflict-check mechanism
+    (app.domain.conflicts.check_conflicts).
+    """
+    stmt = (
+        select(Booking)
+        .where(
+            Booking.staff_id == staff_id,
+            Booking.start_time >= window_start,
+            Booking.start_time < window_end,
+        )
+        .order_by(Booking.start_time)
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def create_booking(
