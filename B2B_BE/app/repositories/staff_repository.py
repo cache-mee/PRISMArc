@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.staff import Staff
+from app.models.staff import Staff, StaffRole
 
 
 async def get_staff_by_phone_number(
@@ -23,3 +23,18 @@ async def get_staff_by_name(db: AsyncSession, name: str) -> Staff | None:
     """
     result = await db.execute(select(Staff).where(Staff.name == name).limit(1))
     return result.scalar_one_or_none()
+
+
+async def list_bookable_staff(db: AsyncSession) -> list[Staff]:
+    """List all Staff who can actually take appointments.
+
+    Filters out ``StaffRole.OWNER_ADMIN`` (e.g. Ramesh, seeded as
+    non-bookable) and returns only ``StaffRole.STAFF`` rows, ordered by name
+    for stable output. This is the single source of truth for "which staff
+    are bookable" (FR-13), reused by both preference validation and any
+    future offering/slot-listing logic.
+    """
+    result = await db.execute(
+        select(Staff).where(Staff.role == StaffRole.STAFF).order_by(Staff.name)
+    )
+    return list(result.scalars().all())
