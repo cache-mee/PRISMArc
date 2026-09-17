@@ -10,6 +10,15 @@
       "Bash(gh pr merge *)"
     ]
   },
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "none",
+    "OTEL_TRACES_EXPORTER": "none",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:4318",
+    "OTEL_METRIC_EXPORT_INTERVAL": "10000"
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -20,6 +29,19 @@
             "command": "P=\"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-leak-guard.py\"; if [ -f \"$P\" ]; then \"$(command -v python3 || command -v python)\" \"$P\"; fi",
             "shell": "bash",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PY=\"\"; for c in python python3 \"py -3\"; do $c -c \"import sys; sys.exit(0 if sys.version_info[0]==3 else 1)\" >/dev/null 2>&1 && PY=\"$c\" && break; done; if [ -n \"$PY\" ]; then $PY \"$CLAUDE_PROJECT_DIR/tools/agent-metrics/otel-persistent-collector.py\" autostart; fi",
+            "shell": "bash",
+            "timeout": 15,
+            "statusMessage": "Checking local agent-cost telemetry collector..."
           }
         ]
       }
