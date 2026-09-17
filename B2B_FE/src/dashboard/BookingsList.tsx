@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchDashboardBookings } from "../api/dashboardBookings";
-import type { BookingEntry } from "../api/dashboardBookings";
+import type { BookingEntry, DashboardView } from "../api/dashboardBookings";
 
 function formatStartTime(startTime: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -28,16 +28,17 @@ function groupByStaffName(
 
 function BookingsList() {
   const [bookings, setBookings] = useState<BookingEntry[]>([]);
+  const [view, setView] = useState<DashboardView>("today");
 
   useEffect(() => {
-    fetchDashboardBookings("today")
+    fetchDashboardBookings(view)
       .then((response) => {
         setBookings(response);
       })
       .catch((error: unknown) => {
         console.error("Failed to load dashboard bookings", error);
       });
-  }, []);
+  }, [view]);
 
   const groupedBookings = groupByStaffName(bookings);
 
@@ -48,6 +49,35 @@ function BookingsList() {
           Owner Dashboard
         </span>
         <h2 className="mt-1 text-2xl font-semibold text-ink">Bookings</h2>
+
+        <div className="mt-4 inline-flex rounded-full border border-border bg-surface p-1">
+          <button
+            type="button"
+            onClick={() => {
+              setView("today");
+            }}
+            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+              view === "today"
+                ? "bg-primary-light text-primary"
+                : "text-ink-muted"
+            }`}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setView("week");
+            }}
+            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+              view === "week"
+                ? "bg-primary-light text-primary"
+                : "text-ink-muted"
+            }`}
+          >
+            This Week
+          </button>
+        </div>
 
         {groupedBookings.size === 0 ? (
           <p className="mt-6 text-sm text-ink-muted">No bookings</p>
