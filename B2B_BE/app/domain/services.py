@@ -2,7 +2,12 @@ from pydantic import BaseModel, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.service import Service
-from app.repositories.services import create_service, get_service_by_id, update_service
+from app.repositories.services import (
+    create_service,
+    deactivate_service,
+    get_service_by_id,
+    update_service,
+)
 
 
 class ServiceNotConfirmedError(ValueError):
@@ -27,6 +32,16 @@ class ServiceEditNotConfirmedError(ValueError):
     ``ProposedServiceEdit.confirmed`` is ``True``. Kept distinct from
     ``ServiceNotConfirmedError``, which stays scoped to the create path
     (FR-15).
+    """
+
+
+class ServiceDeletionNotConfirmedError(ValueError):
+    """Raised when a Service deletion is attempted without an explicit confirmation.
+
+    Enforces FR-17: no Service row's ``is_active`` may flip to ``False``
+    until ``ProposedServiceDeletion.confirmed`` is ``True``. Kept distinct
+    from ``ServiceNotConfirmedError`` (create, FR-15) and
+    ``ServiceEditNotConfirmedError`` (edit, FR-16).
     """
 
 
@@ -127,3 +142,50 @@ async def confirm_and_update_service(
     return await update_service(
         db, service, name=proposed.new_name, price=proposed.new_price
     )
+
+
+class ProposedServiceDeletion(BaseModel):
+    """An already-restated Service removal awaiting explicit confirmation.
+
+    Mirrors ``ProposedService``/``ProposedServiceEdit``'s shape, adapted for
+    deletion: the upstream conversational step (APPOINTMEN-40, not built
+    here) is responsible for restating the removal to Ramesh and setting
+    ``confirmed`` to ``True`` once he agrees. No ``model_validator`` is
+    needed — unlike ``ProposedServiceEdit``, there is no "at least one
+    field" shape constraint; ``service_id`` alone is the entire payload.
+    """
+
+    service_id: int
+    confirmed: bool = False
+
+
+async def confirm_and_delete_service(
+    db: AsyncSession, proposed: ProposedServiceDeletion
+) -> Service:
+    """Deactivate a Service row from a confirmed proposed deletion (FR-17).
+
+    Raises ``ServiceDeletionNotConfirmedError`` if ``proposed.confirmed`` is
+    not ``True`` rather than touching the database at all. Otherwise looks
+    up the row via ``get_service_by_id``, raising ``ServiceNotFoundError``
+    if ``proposed.service_id`` matches no row. Otherwise calls
+    ``deactivate_service`` and returns the deactivated row.
+
+    This is the single place FR-17's guarantee ("removed service no longer
+    offered or returned by Story 2.1 after confirmation") is enforced. The
+    row is soft-deleted (``is_active`` flipped to ``False``), never
+    hard-deleted, since a hard delete would violate
+    ``bookings.service_id``'s FK for any service still referenced by an
+    existing booking.
+    """
+    if proposed.confirmed is not True:
+        raise ServiceDeletionNotConfirmedError(
+            "Cannot delete a Service from an unconfirmed ProposedServiceDeletion."
+        )
+
+    service = await get_service_by_id(db, proposed.service_id)
+    if service is None:
+        raise ServiceNotFoundError(
+            f"No Service record found for service_id={proposed.service_id!r}."
+        )
+
+    return await deactivate_service(db, service)
