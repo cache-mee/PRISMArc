@@ -7,6 +7,12 @@ export interface ChatResponse {
   reply: string;
 }
 
+export const DEFAULT_CHAT_ERROR_MESSAGE =
+  "Failed to process your request. Please try again later.";
+
+/** Thrown for a non-OK /chat response, carrying a user-displayable message. */
+export class ChatRequestError extends Error {}
+
 export async function sendChatMessage(
   request: ChatRequest,
 ): Promise<ChatResponse> {
@@ -19,10 +25,25 @@ export async function sendChatMessage(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Chat request failed with status ${response.status.toString()}`,
-    );
+    throw new ChatRequestError(await extractErrorMessage(response));
   }
 
   return (await response.json()) as ChatResponse;
+}
+
+async function extractErrorMessage(response: Response): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    const detail =
+      typeof body === "object" && body !== null && "detail" in body
+        ? (body as { detail: unknown }).detail
+        : undefined;
+    if (typeof detail === "string" && detail.trim()) {
+      return detail;
+    }
+  } catch {
+    // Response body wasn't JSON (e.g. an upstream gateway error page) —
+    // fall through to the generic message below.
+  }
+  return DEFAULT_CHAT_ERROR_MESSAGE;
 }

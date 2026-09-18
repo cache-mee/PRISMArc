@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { sendChatMessage } from "../api/chat";
+import {
+  ChatRequestError,
+  DEFAULT_CHAT_ERROR_MESSAGE,
+  sendChatMessage,
+} from "../api/chat";
 import { getOrCreateSessionId } from "./session";
 import MaterialIcon from "../shared/MaterialIcon";
 
 interface ChatMessage {
   role: "customer" | "agent";
   text: string;
+}
+
+function toChatErrorText(error: unknown): string {
+  return error instanceof ChatRequestError
+    ? error.message
+    : DEFAULT_CHAT_ERROR_MESSAGE;
 }
 
 function ChatWindow() {
@@ -36,6 +46,10 @@ function ChatWindow() {
       })
       .catch((error: unknown) => {
         console.error("Failed to load opening chat message", error);
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          { role: "agent", text: toChatErrorText(error) },
+        ]);
       });
   }, []);
 
@@ -68,6 +82,10 @@ function ChatWindow() {
       })
       .catch((error: unknown) => {
         console.error("Failed to send chat message", error);
+        setMessages((previousMessages) => [
+          ...previousMessages,
+          { role: "agent", text: toChatErrorText(error) },
+        ]);
       });
   };
 
