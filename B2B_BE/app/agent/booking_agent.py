@@ -78,7 +78,7 @@ tickets:
 
 Once a session is identity-resolved (FR-1/FR-3, ``handle_message`` above), the
 placeholder acknowledgement that used to end the turn there is replaced by
-``run_booking_conversation`` (APPOINTMEN-54): a bounded, ``litellm``-backed
+``run_booking_conversation`` (APPOINTMEN-54): a bounded, Bedrock-backed
 tool-calling loop in which the model itself decides, turn by turn, whether to
 call ``extract_booking_intent``, ``check_availability``, ``propose_booking``,
 or ``confirm_booking`` (``app.tools.booking_flow``, ``BOOKING_TOOLS``) — thin
@@ -102,7 +102,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.booking_intent import BookingIntent
 from app.agent.prompts.booking_agent import build_booking_agent_system_prompt
-from app.agent.providers.litellm_provider import LiteLLMProvider
+from app.agent.providers.bedrock_provider import BedrockProvider
 from app.agent.state import session_store
 from app.agent.state.session_store import SessionState
 from app.config import settings
@@ -409,7 +409,13 @@ async def run_booking_conversation(
     known_staff = await list_bookable_staff_names(db)
     assert state.customer_id is not None  # resolved sessions always have identity set
 
-    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    provider = BedrockProvider(
+        model=settings.bedrock_model_id,
+        region_name=settings.aws_region,
+        max_tokens=settings.bedrock_max_tokens,
+        temperature=settings.bedrock_temperature,
+        top_p=settings.bedrock_top_p,
+    )
     system = build_booking_agent_system_prompt(
         datetime.now(UTC),
         known_services,

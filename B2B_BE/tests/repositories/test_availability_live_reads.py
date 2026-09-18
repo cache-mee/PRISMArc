@@ -18,7 +18,7 @@ against a real ``AsyncSession``, in two scenarios:
   locks that guarantee in.
 """
 
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -32,11 +32,14 @@ from app.models.staff import Staff, StaffRole
 
 pytestmark = pytest.mark.asyncio
 
-# Naive datetimes, matching app.domain.availability._generate_slot_grid's own
-# datetime.combine(day, time) convention (no tzinfo) for the salon's slot grid.
+# UTC-aware, matching app.domain.availability._generate_slot_grid's own
+# datetime.combine(day, time, tzinfo=UTC) convention for the salon's slot grid
+# (Availability.start_time/end_time are DateTime(timezone=True) columns — a naive
+# value here would raise "can't compare offset-naive and offset-aware datetimes"
+# once read back through _is_blocked_at).
 _DAY = date(2026, 9, 21)
-_BLOCK_START = datetime.combine(_DAY, time(10, 0))
-_BLOCK_END = datetime.combine(_DAY, time(11, 0))
+_BLOCK_START = datetime.combine(_DAY, time(10, 0), tzinfo=UTC)
+_BLOCK_END = datetime.combine(_DAY, time(11, 0), tzinfo=UTC)
 
 
 async def _seed_staff(session_factory: async_sessionmaker[AsyncSession]) -> None:
