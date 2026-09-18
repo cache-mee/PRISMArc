@@ -2,11 +2,14 @@ from datetime import UTC, datetime
 
 from app.agent.prompts.booking_agent import build_booking_agent_system_prompt
 
+KNOWN_SERVICES = ["Haircut", "Beard Trim"]
+KNOWN_STAFF = ["Asha", "Ravi"]
+
 
 def test_build_booking_agent_system_prompt_contains_current_datetime() -> None:
     now = datetime(2026, 9, 18, 14, 30, tzinfo=UTC)
 
-    prompt = build_booking_agent_system_prompt(now)
+    prompt = build_booking_agent_system_prompt(now, KNOWN_SERVICES, KNOWN_STAFF)
 
     assert now.isoformat() in prompt
 
@@ -14,7 +17,33 @@ def test_build_booking_agent_system_prompt_contains_current_datetime() -> None:
 def test_build_booking_agent_system_prompt_does_not_raise_for_representative_now() -> None:
     now = datetime(2027, 1, 1, 0, 0, tzinfo=UTC)
 
-    prompt = build_booking_agent_system_prompt(now)
+    prompt = build_booking_agent_system_prompt(now, KNOWN_SERVICES, KNOWN_STAFF)
 
     assert isinstance(prompt, str)
     assert prompt != ""
+
+
+def test_build_booking_agent_system_prompt_lists_known_services() -> None:
+    now = datetime(2026, 9, 18, 14, 30, tzinfo=UTC)
+
+    prompt = build_booking_agent_system_prompt(now, KNOWN_SERVICES, KNOWN_STAFF)
+
+    assert "Haircut" in prompt
+    assert "Beard Trim" in prompt
+
+
+def test_build_booking_agent_system_prompt_lists_known_staff() -> None:
+    now = datetime(2026, 9, 18, 14, 30, tzinfo=UTC)
+
+    prompt = build_booking_agent_system_prompt(now, KNOWN_SERVICES, KNOWN_STAFF)
+
+    assert "Asha" in prompt
+    assert "Ravi" in prompt
+
+
+def test_build_booking_agent_system_prompt_omits_staff_section_when_none_known() -> None:
+    now = datetime(2026, 9, 18, 14, 30, tzinfo=UTC)
+
+    prompt = build_booking_agent_system_prompt(now, KNOWN_SERVICES, [])
+
+    assert "bookable staff are" not in prompt

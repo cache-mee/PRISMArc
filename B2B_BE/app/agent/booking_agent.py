@@ -82,7 +82,7 @@ placeholder acknowledgement that used to end the turn there is replaced by
 tool-calling loop in which the model itself decides, turn by turn, whether to
 call ``extract_booking_intent``, ``check_availability``, ``propose_booking``,
 or ``confirm_booking`` (``app.tools.booking_flow``, ``BOOKING_TOOLS``) — thin
-wrappers around ``parse_booking_intent``, ``confirm_exact_match``,
+wrappers around ``confirm_exact_match``,
 ``present_nearest_alternatives``/``find_nearest_alternatives``,
 ``list_day_slots``, ``present_intent_for_verification``, and
 ``present_alternative_for_verification`` above, all reused unchanged. This
@@ -124,6 +124,8 @@ from app.domain.availability import (
 from app.domain.booking_intent_verification import VerifiedBookingIntent
 from app.domain.customers import find_or_create_customer
 from app.domain.identity import resolve_customer_by_phone
+from app.tools.services import get_service_catalog
+from app.tools.staff import list_bookable_staff_names
 
 _logger = logging.getLogger(__name__)
 
@@ -246,10 +248,11 @@ def present_intent_for_verification(intent: BookingIntent) -> VerifiedBookingInt
     """Surface a freshly-parsed ``BookingIntent`` for the SM-4a checkpoint (APPOINTMEN-21).
 
     This is the hook point a future conversational Booking Agent loop will
-    call immediately after ``parse_booking_intent``
-    (``app.agent.booking_intent``), before staff-preference limiting, an
-    actual availability check, or any Story 2.5/2.6/2.7 (FR-6/7/8)
-    resolution code runs. Not customer-visible — it logs the parsed intent
+    call immediately after the customer's booking intent has been extracted
+    and validated (``app.tools.booking_flow.extract_booking_intent``), before
+    staff-preference limiting, an actual availability check, or any Story
+    2.5/2.6/2.7 (FR-6/7/8) resolution code runs. Not customer-visible — it
+    logs the parsed intent
     as the observable checkpoint moment and returns an unverified
     ``VerifiedBookingIntent``; a human operator reviews or corrects it and
     sets ``verified`` to ``True`` before
@@ -401,8 +404,13 @@ async def run_booking_conversation(
     """
     from app.tools.booking_flow import BOOKING_TOOLS, dispatch_booking_tool
 
+    known_services = [item.name for item in await get_service_catalog(db)]
+    known_staff = await list_bookable_staff_names(db)
+
     provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
-    system = build_booking_agent_system_prompt(datetime.now(UTC))
+    system = build_booking_agent_system_prompt(
+        datetime.now(UTC), known_services, known_staff
+    )
     messages = [*state.history, {"role": "user", "content": message}]
 
     response = None

@@ -50,9 +50,9 @@ async def is_catalog_change_request(text: str) -> bool:
     This is the trigger condition a future Manager Agent hook (``handle_staff_catalog_boundary``)
     uses to redirect a Staff-identified speaker away from an Owner/Admin-only action. It has no
     channel-specific branch and no identity awareness of its own — classification is purely over
-    the message text, mirroring ``app.agent.booking_intent.parse_booking_intent`` and
-    ``app.agent.availability_intent.parse_availability_change``'s shared pattern of a single
-    forced tool call through the provider abstraction.
+    the message text, using a single forced tool call through the provider abstraction, the same
+    technique ``app.tools.booking_flow.extract_booking_intent`` used before it was collapsed into
+    a single-hop structured tool call filled directly by the main loop model.
 
     Deliberately does not fire on availability/schedule requests (e.g. "block out Friday
     morning", FR-25) or on browsing questions about existing prices/services — only on a request

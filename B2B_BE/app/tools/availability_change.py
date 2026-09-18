@@ -19,12 +19,13 @@ that should never be offered these tools in the first place is still refused
 here if it somehow reaches them.
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.manager_agent import (
     SpeakerContext,
-    build_proposed_availability_change,
     render_proposed_availability_change_restatement,
 )
 from app.agent.state import session_store
@@ -67,14 +68,19 @@ def _first_guard_decline(speaker: SpeakerContext, target_staff_name: str) -> str
 class ProposeAvailabilityChangeArgs(BaseModel):
     """LLM-callable tool arguments for proposing an availability change (FR-25).
 
-    ``message`` is the speaker's free-text block/unblock request (e.g. "I'm
-    unavailable Friday morning") — whose schedule is being changed is never
-    parsed from it; it is always the already-resolved ``speaker`` passed
-    alongside these args, the same FR-30 technique
-    ``build_proposed_availability_change`` already relies on.
+    Filled directly by the Manager Agent loop model from the speaker's free-text
+    block/unblock request (e.g. "I'm unavailable Friday morning") — the live current
+    date/time it needs to resolve a relative phrase against is given to it in its own
+    system prompt. Deliberately has no staff-identity field of any kind: whose schedule
+    is being changed is never taken from the model's args, only ever from the
+    already-resolved ``speaker`` passed alongside these args — this is what keeps FR-30's
+    "a staff member cannot alter another staff member's schedule" boundary intact even
+    against args that named someone else.
     """
 
-    message: str
+    start_time: datetime
+    end_time: datetime
+    blocked: bool
 
 
 async def propose_availability_change(
@@ -82,12 +88,13 @@ async def propose_availability_change(
     speaker: SpeakerContext,
     args: ProposeAvailabilityChangeArgs,
 ) -> dict:
-    """Turn ``args.message`` into a pending ``ProposedAvailabilityChange`` (FR-25).
+    """Turn ``args`` into a pending ``ProposedAvailabilityChange`` (FR-25).
 
     Re-consults the FR-21/FR-30 guards for ``speaker`` before ever building a
     change; a decline short-circuits with no session mutation and no restated
-    text to relay. Otherwise builds the change via the existing
-    ``build_proposed_availability_change``, stores it on the session as
+    text to relay. Otherwise builds the change directly from ``args`` and
+    ``speaker.name`` (never from a model-supplied identity field — see
+    ``ProposeAvailabilityChangeArgs``), stores it on the session as
     ``SessionState.pending_availability_change`` (unconfirmed), and returns
     the restatement text for the model to relay back to ``speaker`` — the
     "restate" half of FR-27's restate-then-confirm sequence.
@@ -96,7 +103,13 @@ async def propose_availability_change(
     if guard_decline is not None:
         return {"declined": True, "message": guard_decline}
 
-    change = await build_proposed_availability_change(speaker, args.message)
+    change = ProposedAvailabilityChange(
+        staff_name=speaker.name,
+        start_time=args.start_time,
+        end_time=args.end_time,
+        blocked=args.blocked,
+        confirmed=False,
+    )
 
     state = session_store.get_or_create(session_id)
     state.pending_availability_change = change
