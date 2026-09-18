@@ -207,27 +207,28 @@ async def resolve_and_greet_speaker(
     only call site — purely so the already-resolved branch below can hand
     them to ``run_manager_turn``.
     """
-    state = session_store.get_or_create(session_id)
+    async with session_store.turn_lock(session_id):
+        state = session_store.get_or_create(session_id)
 
-    if state.manager_resolved:
-        speaker = SpeakerContext(
-            id=state.staff_id, name=state.staff_name, role=state.staff_role
-        )
-        return await run_manager_turn(
-            db=db, session_id=session_id, speaker=speaker, message=message
-        )
+        if state.manager_resolved:
+            speaker = SpeakerContext(
+                id=state.staff_id, name=state.staff_name, role=state.staff_role
+            )
+            return await run_manager_turn(
+                db=db, session_id=session_id, speaker=speaker, message=message
+            )
 
-    context = await resolve_speaker(phone_number)
-    if context is None:
-        return None
+        context = await resolve_speaker(phone_number)
+        if context is None:
+            return None
 
-    state.phone_number = phone_number
-    state.staff_id = context.id
-    state.staff_name = context.name
-    state.staff_role = context.role
-    state.manager_resolved = True
-    session_store.save(session_id, state)
-    return render_identity_greeting(context)
+        state.phone_number = phone_number
+        state.staff_id = context.id
+        state.staff_name = context.name
+        state.staff_role = context.role
+        state.manager_resolved = True
+        session_store.save(session_id, state)
+        return render_identity_greeting(context)
 
 
 def present_conflict_check_for_verification(
