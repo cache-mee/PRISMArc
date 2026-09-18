@@ -82,7 +82,9 @@ class ToolSpec:
         self.dispatch = dispatch
 
 
-def _build_tool_schema(name: str, description: str, args_model: type[BaseModel]) -> dict:
+def _build_tool_schema(
+    name: str, description: str, args_model: type[BaseModel]
+) -> dict:
     """Build the OpenAI function-calling schema dict for one tool.
 
     Matches ``app.agent.booking_intent``/``app.agent.availability_intent``'s
@@ -122,7 +124,9 @@ async def _dispatch_verify_booking_intent(
             "error": "nothing_pending",
             "message": "No pending booking intent is awaiting verification.",
         }
-    verified = verify_booking_intent(pending, VerifyBookingIntentArgs.model_validate(args))
+    verified = verify_booking_intent(
+        pending, VerifyBookingIntentArgs.model_validate(args)
+    )
     pending_verification_store.set_pending_booking_intent(None)
     return verified.model_dump(mode="json")
 
@@ -168,7 +172,9 @@ async def _dispatch_verify_conflict_check(
             "error": "nothing_pending",
             "message": "No pending conflict check is awaiting verification.",
         }
-    verified = verify_conflict_check(pending, VerifyConflictCheckArgs.model_validate(args))
+    verified = verify_conflict_check(
+        pending, VerifyConflictCheckArgs.model_validate(args)
+    )
     pending_verification_store.set_pending_conflict_check(None)
     return verified.model_dump(mode="json")
 
