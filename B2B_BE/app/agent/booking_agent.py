@@ -406,10 +406,15 @@ async def run_booking_conversation(
 
     known_services = [item.name for item in await get_service_catalog(db)]
     known_staff = await list_bookable_staff_names(db)
+    assert state.customer_id is not None  # resolved sessions always have identity set
 
     provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
     system = build_booking_agent_system_prompt(
-        datetime.now(UTC), known_services, known_staff
+        datetime.now(UTC),
+        known_services,
+        known_staff,
+        state.customer_name or "there",
+        state.customer_id,
     )
     messages = [*state.history, {"role": "user", "content": message}]
 
