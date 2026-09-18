@@ -1,7 +1,9 @@
 export interface StaffMember {
-  id: string;
-  name: string;
+  staff_id: number;
+  staff_name: string;
   role: string;
+  blocked: boolean;
+  today_booking_count: number;
 }
 
 export async function fetchStaffList(): Promise<StaffMember[]> {
