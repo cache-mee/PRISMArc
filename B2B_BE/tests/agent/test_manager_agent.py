@@ -160,7 +160,11 @@ async def test_run_manager_turn_dispatches_one_tool_then_returns_final_text() ->
     tool_call = ToolCall(
         id="call_1",
         name="propose_availability_change",
-        args={"message": "Block Friday morning"},
+        args={
+            "start_time": "2026-09-18T09:00:00",
+            "end_time": "2026-09-18T13:00:00",
+            "blocked": True,
+        },
     )
     first_response = LLMResponse(
         text=None,
@@ -201,7 +205,7 @@ async def test_run_manager_turn_dispatches_one_tool_then_returns_final_text() ->
     called_session_id, called_speaker, called_args = mock_propose.call_args.args
     assert called_session_id == session_id
     assert called_speaker == STAFF_SPEAKER
-    assert called_args.message == "Block Friday morning"
+    assert called_args.blocked is True
 
     # The tool's JSON result must already be in the message list the *second*
     # `generate` call received — proven via a snapshot taken at call time

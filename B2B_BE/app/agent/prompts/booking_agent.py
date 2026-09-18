@@ -6,24 +6,34 @@ Pure prompt text: builds the ``system`` argument
 here — the four tools it instructs the model to choose between
 (``extract_booking_intent``, ``check_availability``, ``propose_booking``,
 ``confirm_booking``) are implemented in ``app.tools.booking_flow``; this
-module only describes them by name/intent, the same way ``booking_intent.py``
-(``parse_booking_intent``) and ``availability_intent.py``
-(``parse_availability_change``) build their own inline system strings today.
-Pulled into its own module in the already-reserved ``prompts/`` package
-because this prompt is materially longer than either of those — it has to
-cover four tools' worth of turn-by-turn judgment instead of one.
+module only describes them by name/intent. Pulled into its own module in the
+already-reserved ``prompts/`` package because this prompt is materially
+longer than a single-tool classifier prompt — it has to cover four tools'
+worth of turn-by-turn judgment instead of one.
+
+Carries the live service catalog and bookable-staff names directly in the
+prompt text (``known_services``/``known_staff``) so the model itself can
+extract a structured ``extract_booking_intent`` tool call with a real
+service/staff name — no separate, nested LLM call classifies the customer's
+message into structured fields first; ``app.tools.booking_flow.extract_booking_intent``
+still re-validates the model's answer against the same live lists server-side.
 """
 
 from datetime import datetime
 
 
-def build_booking_agent_system_prompt(now: datetime) -> str:
+def build_booking_agent_system_prompt(
+    now: datetime, known_services: list[str], known_staff: list[str]
+) -> str:
     """Build the Booking Agent loop's ``system`` prompt for the current turn.
 
     ``now`` is the reference date/time the model resolves any relative
     phrase (e.g. "Thursday afternoon") against — passed in fresh on every
-    call, the same pattern ``parse_booking_intent``/``parse_availability_change``
-    use, rather than read here.
+    call rather than read here. ``known_services``/``known_staff`` are the
+    live service catalog and bookable-staff names, fetched by the caller
+    (``app.agent.booking_agent.run_booking_conversation``) fresh on every
+    call, so the model always has real names to match ``extract_booking_intent``'s
+    ``service_name``/``staff_preference`` fields against.
 
     Instructs the model to, across as many turns as it needs:
 
@@ -48,11 +58,20 @@ def build_booking_agent_system_prompt(now: datetime) -> str:
         f"The current date/time is {now.isoformat()}. Resolve any relative "
         "date/time phrase the customer uses (e.g. 'tomorrow', 'Thursday "
         "afternoon') against this current date/time.\n\n"
+        f"The salon's offered services are: {', '.join(known_services)}. "
+        + (
+            f"The salon's bookable staff are: {', '.join(known_staff)}. "
+            if known_staff
+            else ""
+        )
+        + "\n\n"
         "You have four tools, and you choose which one to call (or none, if "
         "you just need to reply) on each turn:\n\n"
-        "1. extract_booking_intent — call this to read the customer's "
-        "free-text request (the service they want, any requested date/time, "
-        "any staff preference) once they have said enough for you to attempt "
+        "1. extract_booking_intent — call this to record the customer's "
+        "free-text request (the service they want, matched to one of the "
+        "offered services above; any requested date/time, resolved against "
+        "the current date/time; any staff preference, matched to one of the "
+        "bookable staff above) once they have said enough for you to attempt "
         "it. Ask a brief clarifying question in plain text instead, with no "
         "tool call, if the service is not yet clear.\n"
         "2. check_availability — call this with the extracted intent to "

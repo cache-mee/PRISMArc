@@ -37,15 +37,15 @@ def _unique_session_id() -> str:
 async def test_propose_availability_change_stores_pending_change_and_returns_restatement() -> None:
     session_id = _unique_session_id()
 
-    with patch(
-        "app.tools.availability_change.build_proposed_availability_change",
-        AsyncMock(return_value=_PARSED_CHANGE),
-    ):
-        result = await propose_availability_change(
-            session_id,
-            STAFF_SPEAKER,
-            ProposeAvailabilityChangeArgs(message="I'm unavailable Friday morning"),
-        )
+    result = await propose_availability_change(
+        session_id,
+        STAFF_SPEAKER,
+        ProposeAvailabilityChangeArgs(
+            start_time=_PARSED_CHANGE.start_time,
+            end_time=_PARSED_CHANGE.end_time,
+            blocked=_PARSED_CHANGE.blocked,
+        ),
+    )
 
     state = session_store.get_or_create(session_id)
     assert state.pending_availability_change == _PARSED_CHANGE
@@ -57,21 +57,20 @@ async def test_propose_availability_change_stores_pending_change_and_returns_res
 @pytest.mark.asyncio
 async def test_propose_availability_change_declines_for_owner_admin_without_storing() -> None:
     session_id = _unique_session_id()
-    build_mock = AsyncMock(return_value=_PARSED_CHANGE)
 
-    with patch(
-        "app.tools.availability_change.build_proposed_availability_change", build_mock
-    ):
-        result = await propose_availability_change(
-            session_id,
-            OWNER_ADMIN_SPEAKER,
-            ProposeAvailabilityChangeArgs(message="I'm unavailable Friday morning"),
-        )
+    result = await propose_availability_change(
+        session_id,
+        OWNER_ADMIN_SPEAKER,
+        ProposeAvailabilityChangeArgs(
+            start_time=_PARSED_CHANGE.start_time,
+            end_time=_PARSED_CHANGE.end_time,
+            blocked=_PARSED_CHANGE.blocked,
+        ),
+    )
 
     state = session_store.get_or_create(session_id)
     assert result["declined"] is True
     assert state.pending_availability_change is None
-    build_mock.assert_not_called()
 
 
 @pytest.mark.asyncio

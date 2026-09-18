@@ -2,15 +2,17 @@
 
 Four ``BOOKING_TOOLS`` schema entries the loop's ``provider.generate(..., tools=BOOKING_TOOLS)``
 call lets the model choose between, each a thin wrapper around already-existing, unchanged
-domain/agent functions (``app.agent.booking_intent.parse_booking_intent``,
-``app.agent.booking_agent.confirm_exact_match``/``list_day_slots``,
+domain/agent functions (``app.agent.booking_agent.confirm_exact_match``/``list_day_slots``,
 ``app.domain.appointments.find_nearest_alternatives``/``confirm_and_create_booking``,
 ``app.domain.availability.list_open_slots_for_day``):
 
-- ``extract_booking_intent`` — parses the customer's free-text message into a
-  ``BookingIntent`` (FR-5) against the live service catalog/bookable-staff lists, then
-  immediately runs the SM-4a human-verification checkpoint
-  (``present_intent_for_verification`` -> ``verify_booking_intent`` -> ``require_verified_intent``).
+- ``extract_booking_intent`` — takes the structured ``BookingIntent`` (FR-5) the main loop
+  model itself extracted (the live service catalog/bookable-staff lists are given to that
+  model directly in its own system prompt, ``build_booking_agent_system_prompt`` — no second,
+  nested LLM call parses the customer's message here), validates ``service_name``/
+  ``staff_preference`` against the live catalog/staff lists, then immediately runs the SM-4a
+  human-verification checkpoint (``present_intent_for_verification`` -> ``verify_booking_intent``
+  -> ``require_verified_intent``).
 - ``check_availability`` — resolves either a day-only listing (FR-7) or an exact-time
   check (FR-8's alternative-slot search on a miss), running the SM-4b checkpoint
   (``present_alternative_for_verification`` -> ``verify_alternative_slot`` ->
@@ -51,7 +53,12 @@ from app.agent.booking_agent import (
     present_alternative_for_verification,
     present_intent_for_verification,
 )
-from app.agent.booking_intent import parse_booking_intent
+from app.agent.booking_intent import (
+    BookingIntent,
+    ServiceNotStatedError,
+    resolve_known_service,
+    resolve_known_staff,
+)
 from app.agent.state.session_store import SessionState
 from app.domain.alternative_slot_verification import (
     AlternativeSlotSuggestion,
@@ -90,10 +97,27 @@ class MissingCustomerIdError(ValueError):
 
 
 class ExtractBookingIntentArgs(BaseModel):
-    """LLM-callable tool arguments for ``extract_booking_intent``."""
+    """LLM-callable tool arguments for ``extract_booking_intent`` (FR-5).
 
-    customer_message: str = Field(
-        description="The customer's free-text booking request, verbatim or restated."
+    Filled directly by the main loop model from the customer's free-text message — the
+    live service catalog/bookable-staff lists it needs to do that are given to it in its
+    own system prompt (``build_booking_agent_system_prompt``), the same context the old
+    nested extraction call used to receive instead.
+    """
+
+    service_name: str = Field(
+        description="The salon service the customer wants, matched to one of the offered "
+        "service names given in the system prompt."
+    )
+    requested_time: datetime | None = Field(
+        default=None,
+        description="The date/time the customer requested, resolved against the current "
+        "date/time given in the system prompt, or null if none was stated.",
+    )
+    staff_preference: str | None = Field(
+        default=None,
+        description="The staff member's name the customer asked for by name, or null if "
+        "none was stated.",
     )
 
 
@@ -164,18 +188,36 @@ def _build_tool_schema(
 async def extract_booking_intent(
     db: AsyncSession, state: SessionState, args: ExtractBookingIntentArgs
 ) -> dict:
-    """Parse the customer's free-text message into a verified ``BookingIntent`` (FR-5, SM-4a).
+    """Validate the model-extracted booking intent into a verified ``BookingIntent`` (FR-5, SM-4a).
 
-    Reads the live service catalog/bookable-staff lists as ``parse_booking_intent``'s
-    known-value lists, then runs the SM-4a checkpoint (interim auto-verify — see module
-    docstring) before returning. ``state`` is unused here (no session-scoped value this
-    tool needs) but accepted for a uniform ``dispatch_booking_tool`` call shape.
+    ``args`` is already structured — the main loop model filled it directly from the
+    customer's message using the live catalog/staff names given in its own system prompt.
+    This still re-validates ``service_name``/``staff_preference`` against the live service
+    catalog/bookable-staff lists fetched here (never trusting the model's spelling/match
+    unchecked), raising ``ServiceNotStatedError`` on no match, exactly as the prior
+    nested-LLM-call design did — then runs the SM-4a checkpoint (interim auto-verify — see
+    module docstring) before returning. ``state`` is unused here (no session-scoped value
+    this tool needs) but accepted for a uniform ``dispatch_booking_tool`` call shape.
     """
     known_services = [item.name for item in await get_service_catalog(db)]
     known_staff = await list_bookable_staff_names(db)
 
-    intent = await parse_booking_intent(
-        args.customer_message, known_services=known_services, known_staff=known_staff
+    resolved_service = resolve_known_service(args.service_name, known_services)
+    if resolved_service is None:
+        raise ServiceNotStatedError(
+            f"Could not match a known service in the customer's request: {args.service_name!r}"
+        )
+
+    resolved_staff_preference = args.staff_preference
+    if known_staff and resolved_staff_preference is not None:
+        resolved_staff_preference = resolve_known_staff(
+            resolved_staff_preference, known_staff
+        )
+
+    intent = BookingIntent(
+        service_name=resolved_service,
+        requested_time=args.requested_time,
+        staff_preference=resolved_staff_preference,
     )
 
     pending_intent = present_intent_for_verification(intent)
@@ -338,7 +380,8 @@ async def confirm_booking(
 BOOKING_TOOLS: list[dict] = [
     _build_tool_schema(
         "extract_booking_intent",
-        "Parse the customer's free-text message into a structured, verified booking intent.",
+        "Record the customer's booking intent (service, requested time, staff preference) "
+        "as structured fields, validated against the live catalog/staff lists.",
         ExtractBookingIntentArgs,
     ),
     _build_tool_schema(

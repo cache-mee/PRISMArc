@@ -16,10 +16,9 @@ Defines:
 - ``ToolSpec`` — one registrable tool: its name, its LLM function-calling
   schema dict (the ``{"type": "function", "function": {...}}`` shape
   ``app.agent.providers.base.LLMProvider.generate``'s ``tools`` parameter
-  expects — confirmed against ``app/agent/booking_intent.py`` and
-  ``app/agent/availability_intent.py``'s existing ``_build_tool_schema``
-  helpers, the only other call sites that build this shape today), and an
-  async ``dispatch`` callable.
+  expects — confirmed against ``app/tools/booking_flow.py``'s existing
+  ``_build_tool_schema`` helper, the only other call site that builds this
+  shape today), and an async ``dispatch`` callable.
 - ``STAFF_TOOLS`` / ``OWNER_ADMIN_TOOLS`` — the two per-role tool lists.
 - ``get_tools_for_role`` — the single lookup the loop (Task 6) calls.
 - The dispatch adapters bridging an LLM tool call's flat ``args`` dict to the
@@ -87,8 +86,8 @@ def _build_tool_schema(
 ) -> dict:
     """Build the OpenAI function-calling schema dict for one tool.
 
-    Matches ``app.agent.booking_intent``/``app.agent.availability_intent``'s
-    existing ``_build_tool_schema`` shape exactly — the same shape
+    Matches ``app.tools.booking_flow``'s existing ``_build_tool_schema``
+    shape exactly — the same shape
     ``LLMProvider.generate``'s ``tools`` parameter documents itself as
     expecting (``app/agent/providers/base.py``).
     """
@@ -246,9 +245,8 @@ PROPOSE_AVAILABILITY_CHANGE_TOOL = ToolSpec(
     name="propose_availability_change",
     schema=_build_tool_schema(
         "propose_availability_change",
-        "Turn the staff member's free-text availability change (e.g. 'I'm "
-        "unavailable Friday morning') into a proposed change and return its "
-        "restatement for confirmation (FR-25).",
+        "Record the staff member's block/unblock availability change as a structured "
+        "time window and return its restatement for confirmation (FR-25).",
         ProposeAvailabilityChangeArgs,
     ),
     dispatch=_dispatch_propose_availability_change,
