@@ -201,47 +201,48 @@ async def handle_message(
       or hand the model, so it is answered directly with a prompt rather than
       invoking the loop with an empty user turn.
     """
-    state = session_store.get_or_create(session_id)
+    async with session_store.turn_lock(session_id):
+        state = session_store.get_or_create(session_id)
 
-    if state.resolved:
-        if message is None:
-            return _welcome_message(state.customer_name or "there")
-        return await run_booking_conversation(db, session_id, state, message)
+        if state.resolved:
+            if message is None:
+                return _welcome_message(state.customer_name or "there")
+            return await run_booking_conversation(db, session_id, state, message)
 
-    if state.awaiting_name:
-        if message is None:
-            return _NEW_CUSTOMER_INTERIM
-        assert state.phone_number is not None
-        customer = await find_or_create_customer(db, state.phone_number, message)
-        state.customer_id = customer.id
-        state.customer_name = customer.name
-        state.resolved = True
-        state.awaiting_name = False
-        session_store.save(session_id, state)
-        return _welcome_message(customer.name)
+        if state.awaiting_name:
+            if message is None:
+                return _NEW_CUSTOMER_INTERIM
+            assert state.phone_number is not None
+            customer = await find_or_create_customer(db, state.phone_number, message)
+            state.customer_id = customer.id
+            state.customer_name = customer.name
+            state.resolved = True
+            state.awaiting_name = False
+            session_store.save(session_id, state)
+            return _welcome_message(customer.name)
 
-    if phone_number is None:
-        if message is None:
-            return _ASK_PHONE_NUMBER
-        resolved_phone_number = message
-    else:
-        resolved_phone_number = phone_number
+        if phone_number is None:
+            if message is None:
+                return _ASK_PHONE_NUMBER
+            resolved_phone_number = message
+        else:
+            resolved_phone_number = phone_number
 
-    customer = await resolve_customer_by_phone(db, resolved_phone_number)
+        customer = await resolve_customer_by_phone(db, resolved_phone_number)
 
-    if customer is not None:
+        if customer is not None:
+            state.phone_number = resolved_phone_number
+            state.customer_id = customer.id
+            state.customer_name = customer.name
+            state.resolved = True
+            session_store.save(session_id, state)
+            return _welcome_message(customer.name)
+
         state.phone_number = resolved_phone_number
-        state.customer_id = customer.id
-        state.customer_name = customer.name
-        state.resolved = True
+        state.awaiting_name = True
         session_store.save(session_id, state)
-        return _welcome_message(customer.name)
-
-    state.phone_number = resolved_phone_number
-    state.awaiting_name = True
-    session_store.save(session_id, state)
-    hand_off_to_new_customer_flow(session_id, resolved_phone_number)
-    return _NEW_CUSTOMER_INTERIM
+        hand_off_to_new_customer_flow(session_id, resolved_phone_number)
+        return _NEW_CUSTOMER_INTERIM
 
 
 def present_intent_for_verification(intent: BookingIntent) -> VerifiedBookingIntent:
