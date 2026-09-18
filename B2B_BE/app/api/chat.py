@@ -7,7 +7,9 @@ back into an HTTP response. All identity-resolution logic (FR-1) lives in
 ``booking_agent`` — nothing here forks or duplicates it.
 """
 
-from fastapi import APIRouter, Depends
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,10 @@ from app.agent import booking_agent
 from app.database import get_db
 
 router = APIRouter()
+
+_logger = logging.getLogger(__name__)
+
+CHAT_ERROR_MESSAGE = "Failed to process your request. Please try again later."
 
 
 class ChatRequest(BaseModel):
@@ -30,5 +36,14 @@ class ChatResponse(BaseModel):
 async def chat(
     request: ChatRequest, db: AsyncSession = Depends(get_db)
 ) -> ChatResponse:
-    reply = await booking_agent.handle_message(db, request.session_id, request.message)
+    try:
+        reply = await booking_agent.handle_message(
+            db, request.session_id, request.message
+        )
+    except Exception:
+        _logger.exception(
+            "Unhandled error while processing chat message for session %s",
+            request.session_id,
+        )
+        raise HTTPException(status_code=500, detail=CHAT_ERROR_MESSAGE) from None
     return ChatResponse(reply=reply)
