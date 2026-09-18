@@ -36,5 +36,13 @@ jobs:
             git reset --hard origin/develop
             docker compose build backend
             docker compose up -d backend
-            sleep 5
-            curl -sf http://localhost:8000/health
+            for i in $(seq 1 10); do
+              if curl -sf http://localhost:8000/health; then
+                echo "Backend is healthy"
+                exit 0
+              fi
+              echo "Waiting for backend to be ready ($i/10)..."
+              sleep 3
+            done
+            echo "Backend did not become healthy in time"
+            exit 1
