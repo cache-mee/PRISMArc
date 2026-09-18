@@ -54,9 +54,7 @@ _ROLE_INSTRUCTIONS: dict[StaffRole, str] = {
 }
 
 
-def render_manager_agent_system_prompt(
-    speaker: SpeakerContext, now: datetime
-) -> str:
+def render_manager_agent_system_prompt(speaker: SpeakerContext, now: datetime) -> str:
     """Render the system prompt for one turn of the Manager Agent loop (FR-25/FR-27).
 
     Always names ``speaker.name`` and their resolved role, mirroring
