@@ -1,4 +1,5 @@
 import ChatWindow from "./chat/ChatWindow";
+import BookingsList from "./dashboard/BookingsList";
 import StaffList from "./dashboard/StaffList";
 import Hero from "./shared/Hero";
 import ServicesSection from "./shared/ServicesSection";
@@ -24,6 +25,7 @@ function App() {
         <ServicesSection />
         <StudioInfoSection />
         <StaffList />
+        <BookingsList />
       </main>
 
       <Footer />

@@ -33,5 +33,12 @@ dev = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 
+[tool.ruff.lint]
+# Explicit minimal default selection (pyflakes + a pycodestyle subset), per
+# base-rules.md's "default/near-default config" — pinned rather than left
+# implicit so it doesn't drift with future ruff versions. Excludes
+# flake8-bugbear (B008 flags FastAPI's idiomatic `Depends(...)` default).
+select = ["E4", "E7", "E9", "F"]
+
 [tool.setuptools.packages.find]
 include = ["app*"]

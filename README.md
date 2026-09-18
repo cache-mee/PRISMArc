@@ -306,7 +306,9 @@ salon-app/
 ├── .claude/
 │   ├── agents/              — Role agents (BA, PM, Architect, UX, Developer, Reviewer, QA)
 │   │                           + Lead (ad-hoc coordination), Security (OWASP audits),
-│   │                           Deploy (verified local deploys)
+│   │                           Deploy (verified local docker-compose deploys, and
+│   │                           agent-controlled AWS deploys — EC2+Docker backend,
+│   │                           S3+CloudFront+OAC frontend — gated by the same harness)
 │   ├── hooks/                — Harness enforcement: gate-guard.py, secret-leak-guard.py
 │   ├── skills/               — Workflow skills (sdlc-*-workflow) + capability skills
 │   └── STANDARDS.md         — Normative operating rules (MUST / MUST NOT)
@@ -319,6 +321,8 @@ salon-app/
 │   ├── policy-guard/          — Backend/frontend boundary, at write time
 │   ├── gate-guard.py (in .claude/hooks/) — human-gate enforcement
 │   ├── breaker-check/        — retry/no-progress/budget breaker evaluation
+│   ├── aws-deploy-check/     — read-only AWS guardrails (account/region, open ports,
+│   │                           public S3 access, CloudFront OAC) for the Deploy agent
 │   ├── worktree-add/, env-check/, agent-metrics/
 │   └── README.md             — placement rule for new tools
 ├── stack/                     — Approved tech stack + coding rules

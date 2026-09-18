@@ -285,14 +285,18 @@ async def test_dispatch_propose_availability_change_calls_underlying_tool() -> N
             db=None,
             session_id="session-1",
             speaker=STAFF_SPEAKER,
-            args={"message": "I'm unavailable Friday morning"},
+            args={
+                "start_time": "2026-09-18T09:00:00",
+                "end_time": "2026-09-18T13:00:00",
+                "blocked": True,
+            },
         )
 
     mock_propose.assert_called_once()
     called_session_id, called_speaker, called_args = mock_propose.call_args.args
     assert called_session_id == "session-1"
     assert called_speaker == STAFF_SPEAKER
-    assert called_args.message == "I'm unavailable Friday morning"
+    assert called_args.blocked is True
 
     assert result == {"declined": False, "restatement": "Restated text"}
     json.dumps(result)

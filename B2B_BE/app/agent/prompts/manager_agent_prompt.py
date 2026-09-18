@@ -4,20 +4,26 @@
 ``LLMProvider`` on every turn, alongside ``tools=[t.schema for t in
 get_tools_for_role(speaker.role)]`` (``app.agent.tool_registry``, Task 4). It
 is kept in its own module rather than inlined in ``manager_agent.py`` — unlike
-this codebase's existing single-tool-classifier prompts
-(``app.agent.booking_intent.parse_booking_intent``,
-``app.agent.availability_intent.parse_availability_change``,
-``app.agent.catalog_intent.is_catalog_change_request``), which are short,
-one-shot extraction instructions inlined at their single call site, this
-prompt is a stable, multi-turn persona instruction reused every turn of a
-bounded loop — long/stable enough to warrant the ``app/agent/prompts/``
-package APPOINTMEN-14 scaffolded but left empty.
+this codebase's existing single-tool-classifier prompt
+(``app.agent.catalog_intent.is_catalog_change_request``), a short, one-shot
+extraction instruction inlined at its single call site, this prompt is a
+stable, multi-turn persona instruction reused every turn of a bounded loop —
+long/stable enough to warrant the ``app/agent/prompts/`` package APPOINTMEN-14
+scaffolded but left empty.
 
 Deliberately does not name any tool: the tool list itself is passed
 separately via ``tools=`` (Task 4's registry already enforces which tools a
 given role's session is even offered), so this text stays about behavior and
 persona, not a tool catalog that could drift out of sync with the registry.
+
+Carries the current date/time so the model can resolve a Staff speaker's
+relative block/unblock phrase (e.g. "Friday morning") into the absolute
+``start_time``/``end_time`` window ``propose_availability_change`` now
+requires as structured fields — no separate, nested LLM call does that
+resolution first.
 """
+
+from datetime import datetime
 
 from app.agent.manager_agent import SpeakerContext
 from app.models.staff import StaffRole
@@ -38,12 +44,17 @@ _ROLE_INSTRUCTIONS: dict[StaffRole, str] = {
         "As Staff, you help them review pending booking-intent, "
         "alternative-slot, and conflict-check items awaiting human "
         "verification, and help them report a schedule change (e.g. "
-        "blocking or unblocking a window of availability)."
+        "blocking or unblocking a window of availability). When they report "
+        "one, resolve it to an explicit start and end date/time against the "
+        "current date/time before calling the availability-change tool — "
+        "e.g. 'Friday morning' becomes that Friday 09:00 to 13:00, and a "
+        "bare day name with no daypart (e.g. 'all of Friday') becomes that "
+        "day's 00:00 to 23:59:59."
     ),
 }
 
 
-def render_manager_agent_system_prompt(speaker: SpeakerContext) -> str:
+def render_manager_agent_system_prompt(speaker: SpeakerContext, now: datetime) -> str:
     """Render the system prompt for one turn of the Manager Agent loop (FR-25/FR-27).
 
     Always names ``speaker.name`` and their resolved role, mirroring
@@ -52,6 +63,11 @@ def render_manager_agent_system_prompt(speaker: SpeakerContext) -> str:
     distinct, role-appropriate wording, and every rendering is bound to the
     one resolved speaker passed in, so a session can never read as if it were
     speaking for someone else.
+
+    ``now`` is the reference date/time a Staff speaker's relative
+    block/unblock phrase is resolved against — passed in fresh on every call
+    by the caller (``app.agent.manager_agent.run_manager_turn``) rather than
+    read here, the same pattern ``build_booking_agent_system_prompt`` uses.
 
     Instructs the model to call a tool — rather than answer from memory —
     for anything requiring a domain write (e.g. an availability change) or a
@@ -63,7 +79,8 @@ def render_manager_agent_system_prompt(speaker: SpeakerContext) -> str:
     return (
         f"You are the Manager Agent, a conversational assistant for salon staff and "
         f"owner/admin users, speaking with {speaker.name}, who is resolved and "
-        f"authenticated as {_ROLE_LABEL[speaker.role]}. {role_instructions} "
+        f"authenticated as {_ROLE_LABEL[speaker.role]}. The current date/time is "
+        f"{now.isoformat()}. {role_instructions} "
         "For anything that requires making a real change to the schedule or the "
         "catalog, or recording a decision on a pending item awaiting human "
         "verification, you must call the appropriate available tool rather than "

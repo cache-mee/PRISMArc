@@ -56,7 +56,9 @@ Schema: `.orchestration/schemas/run-record.md`. Append to the existing `{run_rec
 than creating a new file.
 
 - On activation, set `State: unit-testing` in `{run_record}` (create the file per the schema
-  only if it genuinely does not exist yet — e.g. this workflow was invoked standalone).
+  only if it genuinely does not exist yet — e.g. this workflow was invoked standalone). If
+  creating it, stamp `Started:` = now, ISO-8601 (`date -u +%Y-%m-%dT%H:%M:%S+00:00`); if the
+  file already exists, leave its `Started:` untouched.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[unit-test] Phase N — Name` (or `[unit-test] Gate N — Name`), `Owner` = `test`, or exactly
   `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` =

@@ -1,9 +1,8 @@
 """Manager Agent turn logic.
 
 Houses the Manager Agent stub built by APPOINTMEN-17 (FR-24, Staff identity
-resolution) — ``SpeakerContext``, ``resolve_speaker``, ``describe_speaker``,
-and ``build_proposed_availability_change`` — plus one addition by APPOINTMEN-16
-(FR-14, Owner/Admin identity resolution):
+resolution) — ``SpeakerContext``, ``resolve_speaker``, ``describe_speaker`` —
+plus one addition by APPOINTMEN-16 (FR-14, Owner/Admin identity resolution):
 
 - ``render_identity_greeting`` — the role-differentiated opening line the UX
   spec (`bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/staff-owner-manager-chat.md`
@@ -21,7 +20,8 @@ ahead of that module's existing ``confirm_and_*_service`` write gates.
 APPOINTMEN-41 (FR-21, Owner/Admin cannot manage own availability) adds
 ``respond_to_owner_admin_availability_request`` — the hook point that consults
 ``app.domain.owner_admin_availability_boundary.decline_owner_admin_own_availability_request``
-for an already-resolved speaker, ahead of ``build_proposed_availability_change`` /
+for an already-resolved speaker, ahead of
+``app.tools.availability_change.propose_availability_change`` /
 ``confirm_and_apply_availability_change`` ever running for that speaker.
 
 APPOINTMEN-49 (FR-14/FR-24, WhatsApp Staff/Owner identity resolution) adds
@@ -93,12 +93,11 @@ which already has both available at its only call site.
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.availability_intent import parse_availability_change
 from app.agent.catalog_intent import is_catalog_change_request
 from app.agent.state import session_store
 from app.domain.availability import ProposedAvailabilityChange
@@ -132,6 +131,7 @@ _ROLE_GREETINGS: dict[StaffRole, str] = {
     StaffRole.OWNER_ADMIN: "Hi {name}! Want to update the service catalog?",
     StaffRole.STAFF: "Hi {name}! Want to update your availability?",
 }
+
 
 class SpeakerContext(BaseModel):
     """The unambiguous "who is speaking" result for a resolved phone number."""
@@ -210,7 +210,9 @@ async def resolve_and_greet_speaker(
     state = session_store.get_or_create(session_id)
 
     if state.manager_resolved:
-        speaker = SpeakerContext(id=state.staff_id, name=state.staff_name, role=state.staff_role)
+        speaker = SpeakerContext(
+            id=state.staff_id, name=state.staff_name, role=state.staff_role
+        )
         return await run_manager_turn(
             db=db, session_id=session_id, speaker=speaker, message=message
         )
@@ -226,28 +228,6 @@ async def resolve_and_greet_speaker(
     state.manager_resolved = True
     session_store.save(session_id, state)
     return render_identity_greeting(context)
-
-
-async def build_proposed_availability_change(
-    speaker: SpeakerContext,
-    message: str,
-    *,
-    now: datetime | None = None,
-) -> ProposedAvailabilityChange:
-    """Turn a resolved Staff speaker's free-text message into a proposed change (FR-25).
-
-    This is the hook point a future conversational Manager Agent loop calls once a phone
-    number has already been resolved to a ``SpeakerContext`` (via ``resolve_speaker``) and
-    the message has been identified as a block/unblock request. ``speaker.name`` — never
-    anything parsed from ``message`` — is always the staff member the resulting
-    ``ProposedAvailabilityChange`` is attributed to, which is what keeps FR-30's "a staff
-    member cannot alter another staff member's schedule" boundary intact.
-
-    Returns the change with ``confirmed=False`` unchanged from
-    ``parse_availability_change``: restating the change back to the staff member for
-    explicit confirmation is Story 3.3, not built here.
-    """
-    return await parse_availability_change(message, staff_name=speaker.name, now=now)
 
 
 def present_conflict_check_for_verification(
@@ -340,8 +320,7 @@ def render_proposed_availability_change_restatement(
             "Shall I confirm this?"
         )
     return (
-        f"You're unblocking {window} for {change.staff_name}. "
-        "Shall I confirm this?"
+        f"You're unblocking {window} for {change.staff_name}. " "Shall I confirm this?"
     )
 
 
@@ -376,7 +355,7 @@ def present_proposed_availability_change_for_confirmation(
     Mirrors ``present_proposed_service_change_for_confirmation``'s existing shape
     exactly: this is the hook point a future conversational Manager Agent loop
     will call immediately after a ``ProposedAvailabilityChange`` has been built
-    (e.g. from ``build_proposed_availability_change``), before any call to
+    (e.g. from ``app.tools.availability_change.propose_availability_change``), before any call to
     ``confirm_and_apply_availability_change`` (``app.domain.availability``). It
     logs the restated proposal as the observable checkpoint moment and returns
     the restatement text from ``render_proposed_availability_change_restatement``
@@ -395,7 +374,9 @@ def present_proposed_availability_change_for_confirmation(
     return render_proposed_availability_change_restatement(change)
 
 
-async def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -> str | None:
+async def handle_staff_catalog_boundary(
+    speaker: SpeakerContext, message: str
+) -> str | None:
     """Redirect a Staff-identified speaker away from an Owner/Admin-only catalog change (FR-28).
 
     This is the hook point a future conversational Manager Agent loop calls once a phone
@@ -405,7 +386,7 @@ async def handle_staff_catalog_boundary(speaker: SpeakerContext, message: str) -
     request (``is_catalog_change_request``); returns ``None`` otherwise — for an Owner/Admin
     speaker (Ramesh is allowed to manage the catalog, Epic 4, not built here) or for a Staff
     message that is not a catalog-change request, in which case the caller should continue with
-    other intent handling (e.g. FR-25's ``build_proposed_availability_change``).
+    other intent handling (e.g. FR-25's ``app.tools.availability_change.propose_availability_change``).
 
     The returned string is always the fixed redirect copy — never templated from ``message`` or
     ``speaker.name`` — matching the "plain one-line redirect, not an error state" decision, the
@@ -435,7 +416,7 @@ def respond_to_schedule_override_request(
     """Consult the FR-30 guard for an already-resolved speaker and proposed change.
 
     Hook point a future conversational Manager Agent loop calls once a
-    ``ProposedAvailabilityChange`` exists (e.g. from ``build_proposed_availability_change``),
+    ``ProposedAvailabilityChange`` exists (e.g. from ``app.tools.availability_change.propose_availability_change``),
     before ever confirming or applying it. Returns the decline string to send back verbatim
     when not ``None``; returns ``None`` when the change should proceed.
     """
@@ -450,7 +431,7 @@ def respond_to_owner_admin_availability_request(speaker: SpeakerContext) -> str 
     Hook point a future conversational Manager Agent loop calls immediately after an incoming
     message has been classified as a block/unblock-availability request (that classification
     step does not exist yet — see the FR-21 implementation plan's Out of Scope), before
-    ``build_proposed_availability_change`` or ``confirm_and_apply_availability_change`` ever run
+    ``app.tools.availability_change.propose_availability_change`` or ``confirm_and_apply_availability_change`` ever run
     for that speaker. Returns the decline string to send back verbatim when not ``None``;
     returns ``None`` when the request should proceed (Staff).
     """
@@ -473,9 +454,7 @@ _TOOL_LOOP_CAP_REACHED_MESSAGE = (
 message, in place of ever hanging the turn or raising.
 """
 
-_EMPTY_REPLY_FALLBACK = (
-    "I don't have anything further to add on that — is there anything else I can help with?"
-)
+_EMPTY_REPLY_FALLBACK = "I don't have anything further to add on that — is there anything else I can help with?"
 """Returned by ``run_manager_turn`` when the model stops calling tools but its
 final response has no text (``response.text`` is ``None``/empty), so a turn
 never returns an empty string to the speaker.
@@ -509,7 +488,9 @@ async def dispatch_tool(
 
     for tool in get_tools_for_role(speaker.role):
         if tool.name == name:
-            return await tool.dispatch(db=db, session_id=session_id, speaker=speaker, args=args)
+            return await tool.dispatch(
+                db=db, session_id=session_id, speaker=speaker, args=args
+            )
     return {
         "error": "tool_not_available",
         "message": f"Tool {name!r} is not available for this role.",
@@ -546,7 +527,7 @@ async def run_manager_turn(
     the same circular-import reason documented on ``dispatch_tool`` (and
     because ``app.agent.prompts.manager_agent_prompt`` also imports
     ``SpeakerContext`` from this module). ``LiteLLMProvider`` is constructed
-    the same way ``app.agent.availability_intent.parse_availability_change``
+    the same way ``app.agent.booking_agent.run_booking_conversation``
     already does: inline, from ``settings.llm_model``/``settings.llm_api_key``.
     """
     from app.agent.prompts.manager_agent_prompt import (
@@ -559,11 +540,13 @@ async def run_manager_turn(
     state = session_store.get_or_create(session_id)
     messages = state.history + [{"role": "user", "content": message}]
     provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
-    system = render_manager_agent_system_prompt(speaker)
+    system = render_manager_agent_system_prompt(speaker, datetime.now(UTC))
     tools = [tool.schema for tool in get_tools_for_role(speaker.role)]
 
     for _ in range(_MAX_TOOL_ITERATIONS):
-        response = await provider.generate(system=system, messages=messages, tools=tools)
+        response = await provider.generate(
+            system=system, messages=messages, tools=tools
+        )
         messages.append(response.raw_message)
         if not response.tool_calls:
             break

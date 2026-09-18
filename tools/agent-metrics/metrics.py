@@ -615,14 +615,25 @@ def cmd_task(a: argparse.Namespace) -> int:
     # ticket label to scope by - so it is joined by time window alone, same as any unlabelled
     # ledger sample. This never displaces ledger samples; it can only add rows the ledger has
     # none of, since the two capture paths are mutually exclusive on any one machine.
-    persistent, bridged = [], 0
+    persistent, bridged, unfloored = [], 0, []
     if not samples:
         persistent_caps = [c for c in discover(getattr(a, "provider_dir", None))
                            if c["name"] == "otelpersistent"]
         if persistent_caps and steps:
+            # One call PER STEP, bounded by that step's own (since, at] - not one bulk call
+            # bounded only by the last step's `at`. A single bulk call would hand every step
+            # the same log-start-to-end pool and rely on `cost_in_window` to re-narrow it
+            # after the fact; querying per step keeps the fetch itself honest about what
+            # window it claims to answer for, and keeps `all_cost` below from silently
+            # including spend from outside every step's window combined.
             with tempfile.TemporaryDirectory() as td2:
-                _, persistent = _call(persistent_caps[0], "collect",
-                                      {"until": steps[-1]["at"]}, Path(td2))
+                for r in steps:
+                    since = r.get("since")
+                    if since is None:
+                        unfloored.append(r["step"])
+                    _, rows = _call(persistent_caps[0], "collect",
+                                    {"since": since, "until": r["at"]}, Path(td2))
+                    persistent.extend(rows)
             bridged = len(persistent)
             samples = persistent
 
@@ -684,6 +695,13 @@ def cmd_task(a: argparse.Namespace) -> int:
               "          A second Claude Code session active on this machine during the same "
               "window would be\n          indistinguishable from this one. Treat this total "
               "as an estimate, not an invoice line.")
+    if unfloored:
+        steps_str = ", ".join(unfloored)
+        print(f"[metrics] step(s) {steps_str} have no earlier step to bound their window's "
+              "start, so their persistent-collector\n          number covers everything the "
+              "collector logged on this machine from the moment it started up to\n          "
+              "that step's own timestamp - not just that step's work. Treat it as an "
+              "upper-bound estimate, not a measurement.")
     return 0
 
 

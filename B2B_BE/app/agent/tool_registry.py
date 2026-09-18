@@ -16,10 +16,9 @@ Defines:
 - ``ToolSpec`` — one registrable tool: its name, its LLM function-calling
   schema dict (the ``{"type": "function", "function": {...}}`` shape
   ``app.agent.providers.base.LLMProvider.generate``'s ``tools`` parameter
-  expects — confirmed against ``app/agent/booking_intent.py`` and
-  ``app/agent/availability_intent.py``'s existing ``_build_tool_schema``
-  helpers, the only other call sites that build this shape today), and an
-  async ``dispatch`` callable.
+  expects — confirmed against ``app/tools/booking_flow.py``'s existing
+  ``_build_tool_schema`` helper, the only other call site that builds this
+  shape today), and an async ``dispatch`` callable.
 - ``STAFF_TOOLS`` / ``OWNER_ADMIN_TOOLS`` — the two per-role tool lists.
 - ``get_tools_for_role`` — the single lookup the loop (Task 6) calls.
 - The dispatch adapters bridging an LLM tool call's flat ``args`` dict to the
@@ -82,11 +81,13 @@ class ToolSpec:
         self.dispatch = dispatch
 
 
-def _build_tool_schema(name: str, description: str, args_model: type[BaseModel]) -> dict:
+def _build_tool_schema(
+    name: str, description: str, args_model: type[BaseModel]
+) -> dict:
     """Build the OpenAI function-calling schema dict for one tool.
 
-    Matches ``app.agent.booking_intent``/``app.agent.availability_intent``'s
-    existing ``_build_tool_schema`` shape exactly — the same shape
+    Matches ``app.tools.booking_flow``'s existing ``_build_tool_schema``
+    shape exactly — the same shape
     ``LLMProvider.generate``'s ``tools`` parameter documents itself as
     expecting (``app/agent/providers/base.py``).
     """
@@ -122,7 +123,9 @@ async def _dispatch_verify_booking_intent(
             "error": "nothing_pending",
             "message": "No pending booking intent is awaiting verification.",
         }
-    verified = verify_booking_intent(pending, VerifyBookingIntentArgs.model_validate(args))
+    verified = verify_booking_intent(
+        pending, VerifyBookingIntentArgs.model_validate(args)
+    )
     pending_verification_store.set_pending_booking_intent(None)
     return verified.model_dump(mode="json")
 
@@ -168,7 +171,9 @@ async def _dispatch_verify_conflict_check(
             "error": "nothing_pending",
             "message": "No pending conflict check is awaiting verification.",
         }
-    verified = verify_conflict_check(pending, VerifyConflictCheckArgs.model_validate(args))
+    verified = verify_conflict_check(
+        pending, VerifyConflictCheckArgs.model_validate(args)
+    )
     pending_verification_store.set_pending_conflict_check(None)
     return verified.model_dump(mode="json")
 
@@ -240,9 +245,8 @@ PROPOSE_AVAILABILITY_CHANGE_TOOL = ToolSpec(
     name="propose_availability_change",
     schema=_build_tool_schema(
         "propose_availability_change",
-        "Turn the staff member's free-text availability change (e.g. 'I'm "
-        "unavailable Friday morning') into a proposed change and return its "
-        "restatement for confirmation (FR-25).",
+        "Record the staff member's block/unblock availability change as a structured "
+        "time window and return its restatement for confirmation (FR-25).",
         ProposeAvailabilityChangeArgs,
     ),
     dispatch=_dispatch_propose_availability_change,

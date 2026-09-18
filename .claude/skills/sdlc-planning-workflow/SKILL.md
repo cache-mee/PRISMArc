@@ -39,7 +39,9 @@ ambiguous.
 Schema: `.orchestration/schemas/run-record.md`. This record is project-scoped, not
 ticket-scoped, since planning runs before any ticket exists.
 
-- On first use, create `{run_record}` with `Issue: {project_name}`, `State: planning`.
+- On first use, create `{run_record}` with `Issue: {project_name}`, `State: planning`,
+  `Started:` = now, ISO-8601 (`date -u +%Y-%m-%dT%H:%M:%S+00:00`) — set once, at creation,
+  never touched again.
 - After **every** phase below completes, and after every gate reply (`approved` / `revise` /
   `stop`), append one row: `Step` = `[planning] Phase N — Name` (or `[planning] Gate N —
   Name`), `Owner` = `business-analyst` / `product-manager` / `architect` / `ux-designer` for a

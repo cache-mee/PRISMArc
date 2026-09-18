@@ -56,7 +56,8 @@ Boundaries and Auto-Clarity rules, so it never makes a human gate ambiguous.
 Schema: `.orchestration/schemas/run-record.md`.
 
 - On first use, create `{run_record}` with `Issue: {ticket}`, `Branch: n/a` (until Phase 2),
-  `State: in-development`. If a planning-cycle run-record exists for this ticket's originating
+  `State: in-development`, `Started:` = now, ISO-8601 (`date -u +%Y-%m-%dT%H:%M:%S+00:00`) — set
+  once, at creation, never touched again. If a planning-cycle run-record exists for this ticket's originating
   epic (`.orchestration/runs/planning-*/run-record.md`, check its Evidence rows for
   `created:{ticket}`), set `Task:` to that path.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
