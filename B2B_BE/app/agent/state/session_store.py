@@ -12,6 +12,7 @@ Context* decision 5, and *Risks*. This is expected to be replaced by
 ``messages`` table exists.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 
 from app.domain.availability import ProposedAvailabilityChange
@@ -47,6 +48,7 @@ class SessionState:
 
 
 _sessions: dict[str, SessionState] = {}
+_turn_locks: dict[str, asyncio.Lock] = {}
 
 
 def get_or_create(session_id: str) -> SessionState:
@@ -57,3 +59,18 @@ def get_or_create(session_id: str) -> SessionState:
 def save(session_id: str, state: SessionState) -> None:
     """Persist (in-process) ``state`` as the current state for ``session_id``."""
     _sessions[session_id] = state
+
+
+def turn_lock(session_id: str) -> asyncio.Lock:
+    """Return the lock serializing turns for ``session_id``.
+
+    ``SessionState`` is a single mutable object shared by every request for
+    the same ``session_id`` (e.g. Web Chat's auto-sent opening greeting
+    racing a customer's fast first reply). Without serialization, two
+    concurrent turns can interleave reads/writes of the same state — most
+    damagingly ``history``, corrupting it into a message sequence the LLM
+    provider rejects on every later turn, wedging the session until process
+    restart. Callers must hold this for the full turn, from
+    ``get_or_create`` through ``save``.
+    """
+    return _turn_locks.setdefault(session_id, asyncio.Lock())
