@@ -1,0 +1,40 @@
+name: BE-CD
+
+# Deploys B2B_BE to the EC2 demo instance after BE-CI passes on develop.
+# Assumes one-time manual bootstrap already done on the instance: Docker + git
+# installed, repo cloned to ~/PRISMArc, and a real .env in place (RDS + LLM
+# credentials) — this workflow only pulls new code and rebuilds/restarts the
+# backend container. It never touches .env or any secret value on the box.
+
+on:
+  workflow_run:
+    workflows: ["BE-CI"]
+    types: [completed]
+    branches: [develop]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/PRISMArc
+            git fetch origin develop
+            git checkout develop
+            git reset --hard origin/develop
+            docker compose build backend
+            docker compose up -d backend
+            sleep 5
+            curl -sf http://localhost:8000/health
