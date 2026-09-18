@@ -14,8 +14,17 @@ function ChatWindow() {
   const [inputText, setInputText] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+  const hasSentOpeningMessage = useRef(false);
 
   useEffect(() => {
+    // Guards against React 18 StrictMode's dev-only double-invoke of effects,
+    // which would otherwise send this one-time opening greeting request
+    // twice and render two identical agent messages.
+    if (hasSentOpeningMessage.current) {
+      return;
+    }
+    hasSentOpeningMessage.current = true;
+
     const sessionId = getOrCreateSessionId();
 
     sendChatMessage({ session_id: sessionId, message: null })
