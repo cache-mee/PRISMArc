@@ -74,7 +74,7 @@ model makes through the role-scoped registry
 tool's JSON result back to the model — capped at ``_MAX_TOOL_ITERATIONS``
 rounds (a bounded ``for``/``else`` loop, never an unbounded ``while True``) so
 a model that keeps calling tools can never hang the turn. ``get_tools_for_role``,
-``render_manager_agent_system_prompt`` (Task 5), and ``LiteLLMProvider`` are
+``render_manager_agent_system_prompt`` (Task 5), and ``BedrockProvider`` are
 imported locally inside these two functions rather than at module level:
 ``app.agent.tool_registry`` and ``app.agent.prompts.manager_agent_prompt`` both
 import ``SpeakerContext`` from this module, so a module-level import back into
@@ -524,23 +524,30 @@ async def run_manager_turn(
     never silently dropped.
 
     ``get_tools_for_role``, ``render_manager_agent_system_prompt``, and
-    ``LiteLLMProvider`` are imported locally rather than at module level, for
+    ``BedrockProvider`` are imported locally rather than at module level, for
     the same circular-import reason documented on ``dispatch_tool`` (and
     because ``app.agent.prompts.manager_agent_prompt`` also imports
-    ``SpeakerContext`` from this module). ``LiteLLMProvider`` is constructed
+    ``SpeakerContext`` from this module). ``BedrockProvider`` is constructed
     the same way ``app.agent.booking_agent.run_booking_conversation``
-    already does: inline, from ``settings.llm_model``/``settings.llm_api_key``.
+    already does: inline, from ``settings.bedrock_model_id``/
+    ``settings.aws_region``.
     """
     from app.agent.prompts.manager_agent_prompt import (
         render_manager_agent_system_prompt,
     )
-    from app.agent.providers.litellm_provider import LiteLLMProvider
+    from app.agent.providers.bedrock_provider import BedrockProvider
     from app.agent.tool_registry import get_tools_for_role
     from app.config import settings
 
     state = session_store.get_or_create(session_id)
     messages = state.history + [{"role": "user", "content": message}]
-    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    provider = BedrockProvider(
+        model=settings.bedrock_model_id,
+        region_name=settings.aws_region,
+        max_tokens=settings.bedrock_max_tokens,
+        temperature=settings.bedrock_temperature,
+        top_p=settings.bedrock_top_p,
+    )
     system = render_manager_agent_system_prompt(speaker, datetime.now(UTC))
     tools = [tool.schema for tool in get_tools_for_role(speaker.role)]
 

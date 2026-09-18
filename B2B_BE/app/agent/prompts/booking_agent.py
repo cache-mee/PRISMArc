@@ -2,7 +2,7 @@
 
 Pure prompt text: builds the ``system`` argument
 ``app.agent.booking_agent.run_booking_conversation`` passes to
-``LiteLLMProvider.generate`` on every turn of the loop. No tool logic lives
+``BedrockProvider.generate`` on every turn of the loop. No tool logic lives
 here — the four tools it instructs the model to choose between
 (``extract_booking_intent``, ``check_availability``, ``propose_booking``,
 ``confirm_booking``) are implemented in ``app.tools.booking_flow``; this
