@@ -39,14 +39,16 @@ function StaffList() {
         <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
           {staffMembers.map((staffMember) => (
             <li
-              key={staffMember.id}
+              key={staffMember.staff_id}
               className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm"
             >
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-light text-sm font-semibold text-primary">
-                {initials(staffMember.name)}
+                {initials(staffMember.staff_name)}
               </div>
               <div>
-                <p className="font-semibold text-ink">{staffMember.name}</p>
+                <p className="font-semibold text-ink">
+                  {staffMember.staff_name}
+                </p>
                 <p className="text-sm text-ink-muted">{staffMember.role}</p>
               </div>
             </li>
