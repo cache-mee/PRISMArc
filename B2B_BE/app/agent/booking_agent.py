@@ -78,7 +78,7 @@ tickets:
 
 Once a session is identity-resolved (FR-1/FR-3, ``handle_message`` above), the
 placeholder acknowledgement that used to end the turn there is replaced by
-``run_booking_conversation`` (APPOINTMEN-54): a bounded, ``litellm``-backed
+``run_booking_conversation`` (APPOINTMEN-54): a bounded, Bedrock-backed
 tool-calling loop in which the model itself decides, turn by turn, whether to
 call ``extract_booking_intent``, ``check_availability``, ``propose_booking``,
 or ``confirm_booking`` (``app.tools.booking_flow``, ``BOOKING_TOOLS``) — thin
@@ -102,7 +102,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.booking_intent import BookingIntent
 from app.agent.prompts.booking_agent import build_booking_agent_system_prompt
-from app.agent.providers.litellm_provider import LiteLLMProvider
+from app.agent.providers.bedrock_provider import BedrockProvider
 from app.agent.state import session_store
 from app.agent.state.session_store import SessionState
 from app.config import settings
@@ -201,47 +201,48 @@ async def handle_message(
       or hand the model, so it is answered directly with a prompt rather than
       invoking the loop with an empty user turn.
     """
-    state = session_store.get_or_create(session_id)
+    async with session_store.turn_lock(session_id):
+        state = session_store.get_or_create(session_id)
 
-    if state.resolved:
-        if message is None:
-            return _welcome_message(state.customer_name or "there")
-        return await run_booking_conversation(db, session_id, state, message)
+        if state.resolved:
+            if message is None:
+                return _welcome_message(state.customer_name or "there")
+            return await run_booking_conversation(db, session_id, state, message)
 
-    if state.awaiting_name:
-        if message is None:
-            return _NEW_CUSTOMER_INTERIM
-        assert state.phone_number is not None
-        customer = await find_or_create_customer(db, state.phone_number, message)
-        state.customer_id = customer.id
-        state.customer_name = customer.name
-        state.resolved = True
-        state.awaiting_name = False
-        session_store.save(session_id, state)
-        return _welcome_message(customer.name)
+        if state.awaiting_name:
+            if message is None:
+                return _NEW_CUSTOMER_INTERIM
+            assert state.phone_number is not None
+            customer = await find_or_create_customer(db, state.phone_number, message)
+            state.customer_id = customer.id
+            state.customer_name = customer.name
+            state.resolved = True
+            state.awaiting_name = False
+            session_store.save(session_id, state)
+            return _welcome_message(customer.name)
 
-    if phone_number is None:
-        if message is None:
-            return _ASK_PHONE_NUMBER
-        resolved_phone_number = message
-    else:
-        resolved_phone_number = phone_number
+        if phone_number is None:
+            if message is None:
+                return _ASK_PHONE_NUMBER
+            resolved_phone_number = message
+        else:
+            resolved_phone_number = phone_number
 
-    customer = await resolve_customer_by_phone(db, resolved_phone_number)
+        customer = await resolve_customer_by_phone(db, resolved_phone_number)
 
-    if customer is not None:
+        if customer is not None:
+            state.phone_number = resolved_phone_number
+            state.customer_id = customer.id
+            state.customer_name = customer.name
+            state.resolved = True
+            session_store.save(session_id, state)
+            return _welcome_message(customer.name)
+
         state.phone_number = resolved_phone_number
-        state.customer_id = customer.id
-        state.customer_name = customer.name
-        state.resolved = True
+        state.awaiting_name = True
         session_store.save(session_id, state)
-        return _welcome_message(customer.name)
-
-    state.phone_number = resolved_phone_number
-    state.awaiting_name = True
-    session_store.save(session_id, state)
-    hand_off_to_new_customer_flow(session_id, resolved_phone_number)
-    return _NEW_CUSTOMER_INTERIM
+        hand_off_to_new_customer_flow(session_id, resolved_phone_number)
+        return _NEW_CUSTOMER_INTERIM
 
 
 def present_intent_for_verification(intent: BookingIntent) -> VerifiedBookingIntent:
@@ -408,7 +409,13 @@ async def run_booking_conversation(
     known_staff = await list_bookable_staff_names(db)
     assert state.customer_id is not None  # resolved sessions always have identity set
 
-    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    provider = BedrockProvider(
+        model=settings.bedrock_model_id,
+        region_name=settings.aws_region,
+        max_tokens=settings.bedrock_max_tokens,
+        temperature=settings.bedrock_temperature,
+        top_p=settings.bedrock_top_p,
+    )
     system = build_booking_agent_system_prompt(
         datetime.now(UTC),
         known_services,

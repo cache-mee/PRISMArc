@@ -2,7 +2,7 @@
 
 Defines the general seam every LLM call site in ``app/agent/`` calls through, instead of
 each call site hardcoding a specific provider SDK (e.g. ``anthropic.Anthropic``). A
-concrete implementation (see ``litellm_provider.py``) adapts one real provider-calling
+concrete implementation (see ``bedrock_provider.py``) adapts one real provider-calling
 library to this shape; callers depend only on this module, never on a provider SDK
 directly.
 """
@@ -39,9 +39,11 @@ class LLMProvider(Protocol):
     """The interface every LLM provider implementation satisfies.
 
     ``tools`` uses the OpenAI function-calling shape (``{"type": "function", "function":
-    {"name", "description", "parameters"}}``) — the same shape ``litellm`` normalizes
-    every provider's tool-calling request to, so a future non-``litellm`` implementation
-    could still satisfy this same ``Protocol`` without changing any caller.
+    {"name", "description", "parameters"}}``) — the shape every call site already speaks
+    and ``state.history`` is persisted in. ``bedrock_provider.py`` translates this shape to
+    and from AWS Bedrock's native Converse API shape internally (litellm did this same
+    translation for its multi-provider abstraction before this Protocol replaced it with a
+    direct boto3 implementation) — no caller needed to change when that swap happened.
     """
 
     async def generate(

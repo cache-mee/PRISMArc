@@ -90,11 +90,18 @@ def _generate_slot_grid(day: date) -> list[datetime]:
     ``_SALON_OPENING_TIME`` up to, but never at or after,
     ``_SALON_CLOSING_TIME`` — a pure, DB-independent function so the slot
     grid itself can be exhaustively unit-tested.
+
+    Explicitly UTC-aware (not naive): ``_is_blocked_at`` compares these
+    against ``Availability.start_time``/``end_time``, which are
+    ``DateTime(timezone=True)`` columns — psycopg/Postgres hands back
+    timezone-aware datetimes for those, and Python raises ``TypeError`` on a
+    naive-vs-aware comparison. Every other ``_is_blocked_at`` caller
+    (``is_staff_blocked_now``) already passes an aware ``datetime.now(UTC)``.
     """
     slots: list[datetime] = []
     step = timedelta(minutes=_SLOT_DURATION_MINUTES)
-    current = datetime.combine(day, _SALON_OPENING_TIME)
-    closing = datetime.combine(day, _SALON_CLOSING_TIME)
+    current = datetime.combine(day, _SALON_OPENING_TIME, tzinfo=UTC)
+    closing = datetime.combine(day, _SALON_CLOSING_TIME, tzinfo=UTC)
     while current < closing:
         slots.append(current)
         current += step

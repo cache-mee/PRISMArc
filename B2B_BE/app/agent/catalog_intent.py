@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from app.agent.providers.litellm_provider import LiteLLMProvider
+from app.agent.providers.bedrock_provider import BedrockProvider
 from app.config import settings
 
 _TOOL_NAME = "classify_catalog_change_request"
@@ -27,7 +27,7 @@ class NoToolCallReturnedError(RuntimeError):
     """Raised when the LLM response contains no tool call.
 
     ``is_catalog_change_request`` genuinely requires a tool call to produce a
-    classification; this judgment belongs here, not in ``LiteLLMProvider`` (which stays
+    classification; this judgment belongs here, not in ``BedrockProvider`` (which stays
     agnostic about whether an empty ``tool_calls`` list is an error for a given caller).
     """
 
@@ -58,7 +58,9 @@ async def is_catalog_change_request(text: str) -> bool:
     morning", FR-25) or on browsing questions about existing prices/services — only on a request
     to change the catalog itself.
     """
-    provider = LiteLLMProvider(model=settings.llm_model, api_key=settings.llm_api_key)
+    provider = BedrockProvider(
+        model=settings.bedrock_model_id, region_name=settings.aws_region
+    )
     response = await provider.generate(
         system=(
             "You classify whether a message is a request to add, edit/change, or delete/remove "

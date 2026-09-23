@@ -139,7 +139,7 @@ async def test_run_manager_turn_no_tool_calls_returns_text_after_one_generate_ca
         )
     )
 
-    with patch("app.agent.providers.litellm_provider.LiteLLMProvider.generate", mock_generate):
+    with patch("app.agent.providers.bedrock_provider.BedrockProvider.generate", mock_generate):
         result = await run_manager_turn(
             db=None, session_id=session_id, speaker=STAFF_SPEAKER, message="Hi"
         )
@@ -189,7 +189,7 @@ async def test_run_manager_turn_dispatches_one_tool_then_returns_final_text() ->
     )
 
     with (
-        patch("app.agent.providers.litellm_provider.LiteLLMProvider.generate", mock_generate),
+        patch("app.agent.providers.bedrock_provider.BedrockProvider.generate", mock_generate),
         patch("app.agent.tool_registry.propose_availability_change", mock_propose),
     ):
         result = await run_manager_turn(
@@ -236,7 +236,7 @@ async def test_run_manager_turn_caps_at_max_tool_iterations_without_hanging() ->
         )
     )
 
-    with patch("app.agent.providers.litellm_provider.LiteLLMProvider.generate", mock_generate):
+    with patch("app.agent.providers.bedrock_provider.BedrockProvider.generate", mock_generate):
         result = await run_manager_turn(
             db=None,
             session_id=session_id,
@@ -313,7 +313,7 @@ async def test_run_manager_turn_persists_history_across_two_calls_same_session()
         ]
     )
 
-    with patch("app.agent.providers.litellm_provider.LiteLLMProvider.generate", mock_generate):
+    with patch("app.agent.providers.bedrock_provider.BedrockProvider.generate", mock_generate):
         first_result = await run_manager_turn(
             db=None, session_id=session_id, speaker=STAFF_SPEAKER, message="Hi"
         )
