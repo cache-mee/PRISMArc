@@ -9,13 +9,30 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the development wor
 
 ## Conventions
 
-- `{project-root}` is the repository root.
+- `{project-root}` is the **main clone** — never a ticket's worktree, even if this workflow
+  happens to be invoked from inside one. `git rev-parse --show-toplevel` is ambiguous once
+  worktrees exist (it returns whichever checkout you're standing in); the main clone is always
+  the first `worktree` entry in `git worktree list --porcelain`, run from anywhere. Resolve it
+  once at activation and use that absolute path for every `{project-root}`-relative reference
+  below, regardless of which directory subsequent Bash commands `cd`/`-C` into for
+  `{worktree_path}` work.
 - `{ticket}` is the Jira issue key supplied by the user (e.g. `PROJ-42`).
-- `{plans_dir}` resolves to `{project-root}/development/plans/`.
+- `{plans_dir}` resolves to `{worktree_path}/development/plans/` once Phase 2 has created the
+  worktree — Phase 1 never touches it, so there's no ordering conflict.
 - `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md`.
 - `{review_file}` resolves to `{plans_dir}/{ticket}-review.md`.
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
+- `{worktree_path}` is set by Phase 2 (via the `worktree-add` skill) — the isolated git
+  worktree where `{branch_name}` actually lives. From Phase 2 onward, every git/build/test/commit
+  command for this ticket's code, and every read/write under `{plans_dir}`, runs with
+  `{worktree_path}` as its working directory, never `{project-root}`. `development/plans/` is
+  git-tracked (not gitignored) precisely so the plan and review files commit and travel with the
+  branch into any worktree or fresh clone — a later session finds them by resolving
+  `{worktree_path}` again via the `worktree-add` skill, not by a fixed project-root path.
+  `{run_dir}` and `PROJECT-STATUS.md` stay anchored to `{project-root}` regardless — they are
+  cross-ticket / resumability aids meant to be visible from the main checkout independent of which
+  ticket's worktree is currently active.
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
 - **Bounded recovery:** each phase gets one retry on failure before escalating to the user.
 - **Commits are granular:** commit after each completed task, not once at the end.
@@ -39,11 +56,14 @@ Boundaries and Auto-Clarity rules, so it never makes a human gate ambiguous.
 Schema: `.orchestration/schemas/run-record.md`.
 
 - On first use, create `{run_record}` with `Issue: {ticket}`, `Branch: n/a` (until Phase 2),
-  `State: in-development`. If a planning-cycle run-record exists for this ticket's originating
+  `State: in-development`, `Started:` = now, ISO-8601 (`date -u +%Y-%m-%dT%H:%M:%S+00:00`) — set
+  once, at creation, never touched again. If a planning-cycle run-record exists for this ticket's originating
   epic (`.orchestration/runs/planning-*/run-record.md`, check its Evidence rows for
   `created:{ticket}`), set `Task:` to that path.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
-  `[dev] Phase N — Name` (or `[dev] Gate N — Name`), `Owner` = `lead` (Phases 1–2) /
+  `[dev] Phase N — Name` (or `[dev] Gate N — Name`), `Owner` = `lead` (Phases 1–2 — this
+  workflow's own orchestrator acting directly, per Phase 1/2's "Owner: Orchestrator (this
+  workflow)" below; the `.claude/agents/lead.md` Lead Agent is never invoked by this workflow) /
   `developer` (Phases 3–4) / `reviewer` (Phase 6), or exactly `human` for a gate reply,
   `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` / `exit:<code>:<cmd>`
   / `jira:transitioned` / `pr:<url>` / `approved` as applicable, `At` = now, ISO-8601 — get the
@@ -54,6 +74,82 @@ Schema: `.orchestration/schemas/run-record.md`.
   user replies `stop` at any gate.
 - Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
   note it and continue.
+
+---
+
+## Status Artefacts (workflow-status)
+
+Schema: `.orchestration/schemas/ticket-status.md`. These are separate from `{run_record}` —
+`run-record.md` is an append-only metrics ledger; `current.md`/`status.md` are the
+rewritten-in-place snapshot `workflow-status` reads, and `.orchestration/PROJECT-STATUS.md` is
+the project-wide index of active/completed/blocked tickets.
+
+- On first use (Phase 1), create `{run_dir}/current.md` and `{run_dir}/status.md` per the
+  schema, and add a row for `{ticket}` to the **Active Tickets** table in
+  `.orchestration/PROJECT-STATUS.md` (create the file from scratch using the structure already
+  documented in `.claude/skills/workflow-status/SKILL.md`'s Project Overview template if it does
+  not yet exist — do not invent a different shape).
+- After **every** phase and gate reply, update (never append) `current.md`'s five fields and
+  `status.md`'s "You Are Here" section and the matching Phase Tracker row for
+  `sdlc-dev-workflow`, and update this ticket's row in `PROJECT-STATUS.md`'s Active Tickets table
+  (Current Workflow = `sdlc-dev-workflow`, Phase = the phase just reached, Waiting On = the gate
+  question if one is pending, else "—").
+- Phase 2 sets `status.md`'s `Branch:` field once the branch exists, and records `{worktree_path}`
+  in that same Phase 2 Notes cell — a resumed session needs the path, not just the branch name.
+- Phase 5 sets `status.md`'s `PR:` field once the PR is created.
+- On the Phase 6 handoff (see below), set `current.md`'s `waiting` to
+  "new session: /sdlc-dev-workflow review {ticket}" and leave the ticket's `PROJECT-STATUS.md`
+  row in Active Tickets — the ticket is not done; it is handed off, not completed.
+- Never let this slow down or gate the workflow itself. If these files cannot be written, note
+  it and continue — they are resumability aids, not correctness-critical state.
+
+---
+
+## Bounded Recovery (status.json + breaker-check)
+
+Schema: `.orchestration/schemas/status.json`. `{run_dir}/status.json` is the machine-readable
+companion to this workflow's own `current.md`/`status.md`/`run-record.md` — it exists so
+`.orchestration/policy/retry-limits.json` and `breakers.json` can be evaluated against durable
+state instead of an agent's own say-so. Unlike `current.md`/`status.md`, it is **not** updated on
+every phase transition — it is created on first use of this section and updated only at
+retry/failure points.
+
+This wires into the two bounded-recovery points already named in this file: the "each phase gets
+one retry on failure before escalating" convention above, and Phase 4's "If a task fails after one
+retry, the Developer agent stops and escalates" line. Concretely, at the moment a failure is being
+retried (not the first attempt):
+
+1. Record the attempt — do not hand-edit `status.json`; a malformed edit would make every later
+   `breaker-check` call fail with exit 2. Run:
+   ```
+   tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} \
+     --activity implementation_fix --reason "<why this retry is warranted>" \
+     --failure-signal "<observed failure signature>" --evidence "<path to evidence>"
+   ```
+   Use `--activity environment_setup` instead for Phase 3 plan revision / pre-flight-type issues.
+   This creates `{run_dir}/status.json` on first use (per its schema) and appends to `attempts[]`
+   on every call after.
+2. Run, from `{project-root}` (this tool always runs against the main clone's `.orchestration/`,
+   same as every other `{run_dir}`-anchored artefact in this file — never `{worktree_path}`):
+   ```
+   tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}
+   ```
+3. **Exit 0:** proceed with the retry as already described in Phase 4's text.
+4. **Exit 1:** stop — do not attempt the retry. Present `breaker-check`'s printed output verbatim
+   to the user as the reason, per this file's Stop Conditions.
+
+Passing `--ticket {ticket}` also makes `breaker-check` evaluate cumulative ticket cost against
+`.orchestration/policy/budget-limits.json` (if present) — so this same invocation point is also
+this workflow's cost-budget check, IF `tools/agent-metrics` has cost to give it. It currently does
+not, for this workflow: `breaker-check` calls `metrics report --where ticket={ticket}`, which reads
+only `.agent-metrics/ledger.jsonl`, and rows only land there from `metrics run` wrapping an
+invocation with `--label ticket=...` — which nothing in this workflow does. The OTEL collector
+configured in `.claude/settings.json` captures real telemetry (confirmed via `metrics task
+{run_record}`, which joins it by time window), but that path carries no ticket label, so `--where
+ticket={ticket}` cannot see it; `breaker-check` prints `budget-exceeded: SKIP (agent-metrics
+unavailable: ...)` rather than a real check. Until a step here wraps its `claude` invocation with
+`metrics run --label ticket={ticket}`, treat this cost-budget check as not wired up, and do not
+report it to the user as an enforced gate.
 
 ---
 
@@ -88,8 +184,8 @@ Schema: `.orchestration/schemas/run-record.md`.
         │   Read ticket · update status → In Development
         │
         ▼
-  Phase 2: Branch Setup         (git)
-        │   Pull latest · create feature branch · push to remote
+  Phase 2: Branch Setup         (worktree-add skill, git)
+        │   Pull latest · create isolated worktree + feature branch · push to remote
         │
         ▼
   Phase 3: Implementation Plan  (Developer agent)
@@ -168,6 +264,7 @@ Reply with one of:
 ## Phase 2: Branch Setup
 
 **Owner:** Orchestrator (this workflow)
+**Skill:** `worktree-add` (`.claude/skills/worktree-add/SKILL.md`)
 **Tools:** git via Bash
 
 ### Branch naming
@@ -181,11 +278,17 @@ Derive the branch name from the ticket key and summary:
 
 ### Instructions
 
-1. `git checkout {default_branch}` — switch to the default branch.
-2. `git pull origin {default_branch}` — pull latest. If this fails, stop and report.
-3. `git checkout -b {branch_name}` — create the feature branch.
-4. `git push -u origin {branch_name}` — push the empty branch to remote and set upstream.
-5. Confirm the branch exists on remote: `git branch -vv | grep {branch_name}`.
+1. Invoke the `worktree-add` skill with `{branch_name}` (base defaults to `{default_branch}`; pass
+   `--from {default_branch}` explicitly if it was overridden during GitHub Pre-flight). It fetches
+   `origin`, creates `{branch_name}` from `{default_branch}` if it doesn't exist yet, and checks it
+   out into a new isolated worktree. Capture its stdout path as `{worktree_path}`.
+2. If the skill reports a non-zero exit, stop and report per its Failure handling section — do not
+   fall back to a plain `git checkout -b` in `{project-root}`.
+3. `git -C {worktree_path} push -u origin {branch_name}` — push the branch to remote and set
+   upstream (the tool creates the branch and worktree locally but never pushes).
+4. Confirm the branch exists on remote: `git -C {worktree_path} branch -vv | grep {branch_name}`.
+5. From here on, every git/build/test/commit command for this ticket runs with `{worktree_path}`
+   as its working directory — see the `{worktree_path}` convention above.
 
 ---
 
@@ -212,7 +315,9 @@ Derive the branch name from the ticket key and summary:
    - Includes testing requirements derived from `stack/rules/base-rules.md`.
    - Explicitly lists what is out of scope for this ticket.
 4. Save the completed plan to `{plans_dir}/{ticket}-implementation-plan.md`.
-5. No other files are created by this phase — no ticket.md, no status.md, no current.md.
+5. No separate `ticket.md` is created by this phase — the plan file's own Ticket Reference
+   section is the single source of truth for ticket context. (`current.md`/`status.md` are
+   maintained per the **Status Artefacts** section above, not by this phase specifically.)
 
 ### Gate 3 — Plan Review
 
@@ -220,7 +325,7 @@ Present the plan summary to the user, then show the gate prompt:
 
 ```
 ── GATE 3: IMPLEMENTATION PLAN ───────────────────────────────────────────────
-Plan saved at: development/plans/{ticket}-implementation-plan.md
+Plan saved at: {plan_file}
 
 Ticket:  {ticket} — {summary}
 Branch:  {branch_name}
@@ -252,14 +357,17 @@ On `stop`, delete `{plan_file}` if the user requests cleanup, then halt.
 
 ### Instructions
 
-1. Invoke the Developer agent. Pass it the plan file path, coding rules, and ticket summary.
+1. Invoke the Developer agent. Pass it the plan file path, coding rules, ticket summary, and
+   `{worktree_path}` — all file edits, commands and commits for this ticket happen there, not in
+   `{project-root}` (the plan file itself is the one exception: it is read from and, if amended,
+   written back to `{plan_file}` under `{project-root}`).
 2. The Developer agent works through the plan **task by task** in the order defined:
    - Reads the relevant existing code before writing anything.
    - Implements exactly what the plan describes for that task — no additional changes, no unrelated refactors.
    - Runs available lint/test commands (from `CLAUDE.md` stack table or discovered from CI config) after each task.
    - After each task is complete, present the **commit message gate** (see below) before committing.
    - If a task fails after one retry, the Developer agent stops and escalates — it does not skip or silently continue.
-3. After all tasks are committed, run:
+3. After all tasks are committed, run (from `{worktree_path}`):
    ```
    tools/scope-check/scope-check --base {default_branch} --head {branch_name}
    ```
@@ -293,8 +401,8 @@ Reply with one of:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-- On `use`: run `git commit` with the suggested message.
-- On `edit: <message>`: run `git commit` with the user's exact message.
+- On `use`: run `git commit` (from `{worktree_path}`) with the suggested message.
+- On `edit: <message>`: run `git commit` (from `{worktree_path}`) with the user's exact message.
 - On `skip`: continue without committing; remind the user to commit before pushing.
 - Do not commit anything without one of the above responses.
 
@@ -316,7 +424,7 @@ Reply with one of:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-- On `push`: run `git push origin {branch_name}`.
+- On `push`: run `git push origin {branch_name}` from `{worktree_path}`.
 - On `no`: continue to Phase 5.
 - Never run `git push` without this explicit confirmation.
 
@@ -344,7 +452,7 @@ Reply with one of:
    - **Jira Ticket:** link to `{ticket}` on Atlassian
    - **Plan:** path to `{plan_file}`
    - **Test plan:** checklist derived from the plan's testing requirements
-4. Create the PR:
+4. Create the PR (from `{worktree_path}`, so `gh` infers the right repo/branch context):
    ```
    gh pr create \
      --title "{ticket}: {summary}" \
@@ -376,19 +484,21 @@ Implementation is complete and the PR is raised.
   Ticket:   {ticket} — {summary}
   Branch:   {branch_name}
   PR:       {pr_url}
-  Plan:     development/plans/{ticket}-implementation-plan.md
+  Plan:     {plan_file}
 
 To start the code review, open a NEW Claude Code session and run:
   /sdlc-dev-workflow review {ticket}
 
 The Reviewer agent will read the plan, inspect the PR diff, and produce
-development/plans/{ticket}-review.md with a PASS or FAIL verdict.
+{review_file} with a PASS or FAIL verdict.
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
 ### When invoked in review mode (`/sdlc-dev-workflow review {ticket}`)
 
-1. Read `{plan_file}`. If not found, ask the user for the path.
+1. Resolve `{worktree_path}` for `{branch_name}` via the `worktree-add` skill (idempotent — this
+   is a fresh session, so nothing has created or found it yet here). Read `{plan_file}` from
+   inside it. If not found, ask the user for the path.
 2. Get the PR diff: `gh pr diff` (detect PR from branch) or `git diff {default_branch}...{branch_name}`.
 3. Run `tools/scope-check/scope-check --base {default_branch} --head {branch_name}` independently
    — do not trust that Phase 4's check still holds; commits may have been added since. A FAIL
@@ -407,13 +517,15 @@ development/plans/{ticket}-review.md with a PASS or FAIL verdict.
 
 ```
 ── REVIEW FAILED ─────────────────────────────────────────────────────────────
-Review: development/plans/{ticket}-review.md
+Review: {review_file}
 
 CRITICAL issues: {N}  (must fix before merge)
 MAJOR issues:    {N}  (should fix before merge)
 
 To fix and re-review:
-1. Address the CRITICAL and MAJOR issues in the review file.
+1. Address the CRITICAL and MAJOR issues in the review file, in the ticket's worktree
+   ({worktree_path} — re-run the `worktree-add` skill with {branch_name} if this is a fresh
+   session and the path isn't already known).
 2. Commit fixes to branch {branch_name}.
 3. Push: git push origin {branch_name}
 4. Re-run: /sdlc-dev-workflow review {ticket}
@@ -422,33 +534,48 @@ To fix and re-review:
 
 ### On PASS
 
+**Do not target Jira's "Done" (or any status in Jira's `done` status category) at this point.**
+QA has not run yet — `sdlc-unit-test-workflow` and `sdlc-qa-workflow` still stand between this
+review passing and the ticket being genuinely finished. Reaching a `done`-category status is
+`sdlc-qa-workflow` Phase 4's job (see that skill's Jira-transition rule), never this phase's.
+
 1. Call `mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue` with: `"Automated review passed. PR {pr_url} is ready for merge."`.
-2. Present the **Done gate** and wait for the user's reply:
+2. Present the **next-stage gate** and wait for the user's reply:
 
 ```
 ── REVIEW PASSED ─────────────────────────────────────────────────────────────
-Review: development/plans/{ticket}-review.md
+Review: {review_file}
 
-The PR is ready to merge.
+The PR is ready to merge, but QA has not run yet.
   PR:     {pr_url}
   Ticket: {ticket}
 
-Move {ticket} to "Done" in Jira now?
+Move {ticket} forward in Jira now (to whatever this project's next in-progress
+status is after review — e.g. "Ready for QA" — never to Done/Ready for UAT/any
+done-category status)?
 
 Reply with one of:
-  yes   → transition ticket to Done in Jira
-  no    → skip (you can transition manually in Jira after merging)
+  yes   → transition ticket to the next in-progress status in Jira
+  no    → skip (leave the ticket's Jira status as-is)
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-   - On `yes`: call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` for `{ticket}` to find the transition to "Done", then call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue`. If the transition fails (e.g. project requires PR to be merged first), log the failure and advise the user to transition manually.
+   - On `yes`: call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` for `{ticket}`.
+     Select the available transition whose target status has the **highest indeterminate**
+     progress that is still short of the `done` category (`statusCategory.key` of `new` or
+     `indeterminate`, never `done`) — e.g. "Ready for QA" / "In QA". If no such transition is
+     available, do not force one; report the available options to the user and let them choose,
+     or skip.
    - On `no`: continue.
+   - Next steps for the user: run `sdlc-unit-test-workflow` (unit tests) then `sdlc-qa-workflow`
+     (integration tests + the actual done-category Jira transition) for `{ticket}`.
 
 ---
 
 ## Plans Directory Structure
 
-`{plans_dir}` = `development/plans/`
+`{plans_dir}` = `{worktree_path}/development/plans/` — inside the ticket's worktree, not the main
+checkout.
 
 ```
 development/
@@ -457,9 +584,16 @@ development/
     └── {ticket}-review.md                # Review output (created only during Phase 6)
 ```
 
-**One plan file per ticket. No ticket.md, no status.md, no current.md.**
-The plan file contains the ticket reference, branch, acceptance criteria, and all tasks.
-It is the only artefact persisted to disk between phases.
+**One plan file per ticket. No separate `ticket.md`.**
+The plan file contains the ticket reference, branch, acceptance criteria, and all tasks — it is
+the single source of truth for ticket context. `development/plans/` is git-tracked, so these files
+commit and travel with `{branch_name}`. Other workflows (`sdlc-unit-test-workflow`,
+`sdlc-qa-workflow`) MUST get there by resolving `{worktree_path}` for `{branch_name}` via the
+`worktree-add` skill first, then reading `{plans_dir}` inside it — never by guessing a
+`{project-root}`-relative path, and never from a `{run_dir}`-relative guess.
+`current.md`/`status.md` under `{project-root}/.orchestration/runs/{ticket}/` are also maintained
+(see **Status Artefacts** above) — they stay in the main checkout, are resumability aids read by
+`workflow-status`, and are not a second copy of the plan's content.
 
 ---
 
@@ -482,16 +616,18 @@ The Developer agent MUST NOT invoke `bmad-quick-dev` (deprecated), `bmad-dev-sto
 - GitHub pre-flight fails and the user does not resolve the issue.
 - A required source file or artefact does not exist on disk.
 - The Developer agent exhausts its retry limit without producing output.
-- A lint or test run fails after one retry.
+- A lint or test run fails after one retry — see **Bounded Recovery** above: a retry beyond that
+  point requires a clean `tools/breaker-check/breaker-check` exit (0); a non-zero exit stops the
+  retry and surfaces the tripped breaker's output verbatim.
 - `tools/scope-check/` reports a violation (the change touches both `B2B_BE/` and
   `B2B_FE/`) — resolved only by re-planning the ticket as two bounded changes, never by
   overriding the check.
 - A human decision is required that no agent can make.
 
-On any stop: tell the user exactly where things stand and what command to run to resume. The plan file at `{plan_file}` preserves all context needed to continue in a future session.
+On any stop: tell the user exactly where things stand and what command to run to resume. The plan file at `{plan_file}` preserves all context needed to continue in a future session; `current.md`/`status.md` (Status Artefacts, above) also reflect the stop for `workflow-status` to surface.
 
 ---
 
 ## Resuming a Stopped Run
 
-On activation, the workflow checks whether `{plan_file}` exists. If it does, it reads the file, presents a resume/restart/view prompt, and continues from the appropriate phase. No separate status file is needed — the plan file is the single resume anchor.
+On activation, the workflow checks whether `{plan_file}` exists. If it does, it reads the file, presents a resume/restart/view prompt, and continues from the appropriate phase. The plan file is the authoritative resume anchor for this workflow's own logic; `current.md`/`status.md` are updated alongside it so `workflow-status` stays accurate but are never the source of truth for what phase to resume into.

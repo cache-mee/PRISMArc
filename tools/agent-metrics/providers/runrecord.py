@@ -37,6 +37,19 @@ THE FORMAT IT READS
     cells is skipped rather than guessed at, because a record this cannot read is a record
     written by something else, and inventing a reading of it would be worse than silence.
 
+WHY THE FIRST STEP NEEDS `Started:`
+
+    Every step but the first is bounded below by the row before it - that is what `since` is,
+    for every row after the first. The first step has no earlier row, so without something
+    else to anchor it, its floor is `None`: unbounded. `cost_in_window` in the caller treats
+    `None` as "no lower bound at all", and the persistent-collector bridge
+    (`otelpersistent.py`) has no ticket label to narrow that on its own - an unbounded first
+    step's number ends up covering everything the collector logged on this machine since it
+    started, not that step's work. `Started:`, stamped once by whichever workflow phase
+    creates this file, closes that gap for records that carry it; a record written before this
+    field existed simply has none, and its first step stays an open-ended, upper-bound
+    estimate, exactly as it always was.
+
 @author Samson Paul, samson.paul@experionglobal.com
 """
 
@@ -65,7 +78,8 @@ PROVIDES = ["rework", "human_interventions", "outcome", "build_status", "steps"]
 
 # `Issue` and `State` are what this reads; the rest are carried through if present. Extra
 # names cost nothing and let a project keep its own header without a flag.
-FIELD_RE = re.compile(r"^(Task|Bolt|Ticket|Story|Issue|Branch|State|Next):\s*(.*)$", re.M)
+FIELD_RE = re.compile(r"^(Task|Bolt|Ticket|Story|Issue|Branch|State|Next|Started):\s*(.*)$",
+                      re.M)
 EXIT_RE = re.compile(r"^exit:(\d+):")
 
 
@@ -89,12 +103,17 @@ def step_rows(rec: dict) -> list[dict]:
     rows = rec["rows"]
     attempts = Counter()
     out = []
+    # The very first row has no earlier row to bound its start. `Started:` - stamped once, when
+    # the record was created - is the only floor available for it; a record written before that
+    # field existed simply has none, and the first step's window stays open-ended below, same as
+    # it always has. Every row after the first is bounded by the row before it, same as before.
+    record_started = rec["fields"].get("Started") or None
     for i, r in enumerate(rows):
         attempts[r["n"]] += 1
         # `At` is stamped when the row COMPLETES. So the window a step occupied opens when
         # the row before it closed, and shuts at its own stamp - not the other way round.
         # Getting this backwards attributes every step's spend to the step after it.
-        since = rows[i - 1]["at"] if i else None
+        since = rows[i - 1]["at"] if i else record_started
         code = EXIT_RE.match(r["evidence"] or "")
         out.append({
             "provider": NAME, "kind": "step",
@@ -181,6 +200,19 @@ def self_test() -> int:
               steps[4]["build_status"] == "pass" and steps[2]["build_status"] == "fail")
         check("a step's window opens when the previous row closed",
               steps[1]["since"] == steps[0]["at"] and steps[0]["since"] is None)
+
+        # A record with no `Started:` field (the shape every record had before this field
+        # existed) leaves the first step's floor at `None`, exactly as above - never invented.
+        started = Path(td) / "TASK-902.md"
+        started.write_text(RECORD.replace("Next:   triage the review",
+                                          "Next:   triage the review\n"
+                                          "Started: 2026-09-16T08:55:00+00:00"),
+                           encoding="utf-8")
+        steps2 = [r for r in collect({"record": str(started)}) if r["kind"] == "step"]
+        check("`Started:` becomes the first step's floor when the record carries one",
+              steps2[0]["since"] == "2026-09-16T08:55:00+00:00")
+        check("later steps are still bounded by the row before them, not by `Started:`",
+              steps2[1]["since"] == steps2[0]["at"])
 
         # NEGATIVE: a table that is not six cells is skipped, never guessed at.
         f.write_text(RECORD.replace("| 1 | — | lead | done | commit:aaa |",

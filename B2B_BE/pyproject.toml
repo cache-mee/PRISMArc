@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "b2b-be"
+version = "0.1.0"
+description = "Agentic Appointment Management Engine — backend service (Salon Edition)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.1",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "python-dotenv>=1.0",
+    "anthropic>=0.40",
+    "boto3>=1.34",
+    "twilio>=9.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "aiosqlite>=0.20",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff.lint]
+# Explicit minimal default selection (pyflakes + a pycodestyle subset), per
+# base-rules.md's "default/near-default config" — pinned rather than left
+# implicit so it doesn't drift with future ruff versions. Excludes
+# flake8-bugbear (B008 flags FastAPI's idiomatic `Depends(...)` default).
+select = ["E4", "E7", "E9", "F"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

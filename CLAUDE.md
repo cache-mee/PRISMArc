@@ -96,10 +96,41 @@ NEXT AGENT
 Simple work: `Agent → Skill → Tool → Evidence`.
 Complex work: `Lead → (Test, Developer, Reviewer)`, each producing evidence and handoffs.
 
+**Ticket-scoped SDLC work uses a different entry point.** Instead of assembling
+an ad-hoc Lead/Test/Developer/Reviewer sequence, start it with the applicable
+**workflow skill**:
+
+```
+sdlc-planning-workflow     idea → brief → PRD → stack → UX → epics/stories
+sdlc-dev-workflow          ticket → plan → implementation → PR → review
+sdlc-unit-test-workflow    implemented code → unit tests
+sdlc-qa-workflow           PR → integration test plan → PASS/FAIL
+```
+
+A workflow skill (`.claude/skills/<name>/SKILL.md`) is a narrow, named
+exception to "skills do not decide what runs next" (`.claude/STANDARDS.md`
+§2): it owns that one workflow's phase sequence and gates, and invokes the
+applicable agent per phase —
+
+```
+WORKFLOW SKILL   owns phase sequencing and gates for its one named SDLC workflow
+  |
+AGENT            performs the bounded work for the current phase
+  |
+CAPABILITY SKILL / TOOL
+  |
+EVIDENCE
+```
+
+No other skill has this exception; every other skill is a capability skill and
+remains bound by rule 1 below.
+
 Operating rules:
 
-1. **Agents own orchestration.** Skills do not decide what runs next; tools do not
-   make workflow decisions.
+1. **Agents own orchestration for ad-hoc and cross-workflow work.** Within one
+   of the four named SDLC workflows above, the workflow skill owns phase
+   sequencing instead. Capability skills never decide what runs next; tools do
+   not make workflow decisions.
 2. **Evidence, not claims.** "Tests passed" is a claim. A command, its scope, its
    exit code and its output are evidence. Where deterministic validation is
    possible, an agent's assertion alone MUST NOT be accepted as proof.
@@ -125,6 +156,7 @@ Operating rules:
 | Normative AI-development rules | `.claude/STANDARDS.md` |
 | Agent contracts | `.claude/agents/` |
 | Skill contracts | `.claude/skills/<skill>/SKILL.md` |
+| SDLC workflow entry points (ticket-scoped orchestration) | `.claude/skills/sdlc-{planning,dev,unit-test,qa}-workflow/SKILL.md` — see **How Claude Code works** above |
 | Claude Code lifecycle hooks (e.g. secret-leak guard) | `.claude/hooks/`, wired in `.claude/settings.json` — see `.claude/hooks/README.md` |
 | Skill-specific scripts | `.claude/skills/<skill>/scripts/` (none yet) |
 | Shared deterministic tools | `tools/` (empty by design — see `tools/README.md`) |

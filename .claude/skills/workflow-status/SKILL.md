@@ -7,6 +7,14 @@ description: Shows where you are in any SDLC workflow. Call with no arguments fo
 
 This skill is read-only. It reads status files and presents them — it does not change anything.
 
+**Resolve the main clone first.** `.orchestration/PROJECT-STATUS.md` and `.orchestration/runs/`
+live in the **main clone**, not any ticket's worktree — if this skill is invoked from inside a
+worktree created by `sdlc-dev-workflow` (`.claude/skills/worktree-add/SKILL.md`), reading these
+paths relative to the current directory reads that worktree's own stale checked-out copy instead
+of the live one. The main clone is always the first `worktree` entry in
+`git worktree list --porcelain`, run from anywhere. Resolve that path once, and read every
+`.orchestration/`-relative path below from it.
+
 ---
 
 ## On Activation

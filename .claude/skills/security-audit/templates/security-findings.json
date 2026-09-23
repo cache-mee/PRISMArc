@@ -1,0 +1,42 @@
+{
+  "audit_id": "SEC-AUDIT-001",
+  "project": "<project-name>",
+  "date": "<YYYY-MM-DD>",
+  "mode": "READ-ONLY",
+  "status": "PASS",
+  "summary": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 0
+  },
+  "checks": [
+    {
+      "name": "<check name>",
+      "status": "PASS",
+      "tool": "<scanner or built-in check name>"
+    }
+  ],
+  "findings": [
+    {
+      "id": "SEC-001",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "owasp": "A02",
+      "status": "OPEN",
+      "file": "path/to/file.ts",
+      "line": 42,
+      "evidence": "Concise, redacted evidence.",
+      "impact": "Concise impact.",
+      "recommendation": "Concise recommendation."
+    }
+  ],
+  "skipped": [
+    {
+      "check": "<check name>",
+      "reason": "SKIPPED — tool unavailable"
+    }
+  ],
+  "limitations": []
+}

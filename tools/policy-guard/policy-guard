@@ -1,0 +1,22 @@
+#!/bin/sh
+# @author Samson Paul, samson.paul@experionglobal.com
+# Launcher for policy-guard. Finds a Python 3 by whatever name this machine calls it.
+#
+# `python3` does not exist on Windows and `python` is Python 2 on some older Linux and on
+# macOS before 12.3 - so neither name can be assumed, and a name alone is not enough. Each
+# candidate is asked its version and only accepted if it answers 3.
+DIR="$(cd "$(dirname "$0")" && pwd)"
+TOOL="$DIR/policy-guard.py"
+
+for c in python3 python py python3.13 python3.12 python3.11 python3.10 python3.9 python3.8; do
+  command -v "$c" >/dev/null 2>&1 || continue
+  if "$c" -c 'import sys; sys.exit(0 if sys.version_info[0] == 3 else 1)' 2>/dev/null; then
+    exec "$c" "$TOOL" "$@"
+  fi
+done
+
+echo "policy-guard: no Python 3 found." >&2
+echo "  tried: python3, python, py, python3.13 ... python3.8" >&2
+echo "  install Python 3 (https://python.org), or set one explicitly:" >&2
+echo "    /path/to/python3 $TOOL $*" >&2
+exit 127

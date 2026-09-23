@@ -3,16 +3,18 @@ title: Stack Proposal — Agentic Appointment Management Engine (Salon Edition)
 status: approved
 owner: Architect
 created: 2026-09-17
-updated: 2026-09-17
+updated: 2026-09-18
 approved_date: 2026-09-17
 sources:
   - bmad-output/planning-artifacts/prd/prd-salon-app-2026-09-17/prd.md
   - bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/brief.md
   - bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/addendum.md
   - CLAUDE.md (repository layout constraint)
+  - ".env.example, docker-compose.yml (2026-09-18 hosting revision — confirms RDS already in use)"
 gate: "Gate 3 — Stack Approval: APPROVED by user on 2026-09-17, unchanged from this document. The user's
   only question (Twilio WhatsApp integration path) was answered by confirming §6.2's Sandbox
-  recommendation already covers it; no revision was requested."
+  recommendation already covers it; no revision was requested. See §5 Revision (2026-09-18) for a
+  post-approval hosting update that does not reopen Gate 3 — see that note for why."
 ---
 
 # Stack Proposal — Agentic Appointment Management Engine (Salon Edition)
@@ -157,6 +159,10 @@ formally here, not accepted silently, per `addendum.md` §4 row 9.**
   it for free. This satisfies the letter of NFR §7 (minimal is acceptable) while being materially safer
   against the demo's own flagged top risk.
 
+**Note (2026-09-18, carried from §5 revision below):** the *hosting* of this Postgres instance was
+finalized as AWS RDS — see the §5 revision block. This §3 recommendation (Postgres as the engine/data
+model) is unchanged; only where it physically runs was an open question, and it is now closed.
+
 ## 4. Mobile — N/A for this MVP (explicit, not a silent omission)
 
 **No native mobile app (iOS/Android) is proposed, and none is in scope for this MVP.**
@@ -195,8 +201,9 @@ Scoped explicitly to a 24-hour hackathon build, not a production deployment — 
 folder, so it does not conflict with `CLAUDE.md`'s `B2B_BE/`/`B2B_FE/` split; flagged explicitly here so
 it is not mistaken for an exception being smuggled in.
 
-**Hosting for the demo:** two viable options, both appropriate for 24 hours — the team should pick based
-on how much they want the demo to depend on a laptop staying online:
+**Original hosting recommendation (2026-09-17, as approved at Gate 3):** two viable options, both
+appropriate for 24 hours — the team should pick based on how much they want the demo to depend on a
+laptop staying online:
 1. **Local + tunnel (recommended default):** run `docker-compose up` locally; expose the backend
    publicly via ngrok or a Cloudflare Tunnel so Twilio's WhatsApp webhook has a reachable HTTPS URL. This
    is the fastest path to a working WhatsApp integration and directly mitigates the Twilio
@@ -205,13 +212,77 @@ on how much they want the demo to depend on a laptop staying online:
    fallback if the team prefers not to depend on a laptop's network connection during judging; costs a
    few extra minutes of setup over option 1 for materially better demo-day reliability.
 
-Full cloud infrastructure (e.g., AWS ECS/Fargate, managed Kubernetes) is explicitly **not** recommended:
-no NFR in the PRD asks for production-grade scaling, and adding cloud-infra setup on top of the
-already-flagged Twilio lead-time risk works against the 24-hour constraint rather than for it.
+Full cloud infrastructure (e.g., AWS ECS/Fargate, managed Kubernetes) was explicitly **not** recommended
+at that time: no NFR in the PRD asks for production-grade scaling, and adding cloud-infra setup on top of
+the already-flagged Twilio lead-time risk works against the 24-hour constraint rather than for it.
 
-**CI/CD:** no pipeline is required by any PRD requirement. A single, optional GitHub Actions workflow
-running backend tests (`pytest`) and a lint pass on push is a reasonable nice-to-have; a full
-build/test/deploy pipeline is out of scope for this build window.
+---
+
+### Revision — 2026-09-18: finalized hosting
+
+**Status:** this supersedes the "Hosting for the demo" recommendation above. It does not reopen or
+reverse Gate 3 (stack approval) — Gate 3 approved the *stack* (React/FastAPI/Postgres/Twilio/etc.), and
+this revision only replaces one implementation option (§5's *demo hosting mechanism*) with the option the
+team actually deployed. It also does not reverse the "no full cloud infrastructure" reasoning: that
+reasoning was explicitly scoped to ECS/Fargate/managed-Kubernetes-class orchestration complexity — the
+setup below (one burstable EC2 instance running Docker directly, one managed static-hosting/CDN pair, one
+managed database) is not that class of complexity, and does not trade away any of the reasons the original
+recommendation gave. Recorded here as a revision, not a silent edit, per this agent's obligation to track
+decisions that materially change a prior one.
+
+**What actually shipped, confirmed by the user, not re-derived by this agent:**
+
+1. **Backend (`B2B_BE/`) — AWS EC2, instance type `t2.micro`.** The existing `B2B_BE/Dockerfile` is built
+   and run directly on the instance via Docker (`docker compose build`/`up` of just the `backend`
+   service) — no ECS, no Fargate, no orchestrator. This satisfies the same need the original "local +
+   tunnel" option addressed (a reachable HTTPS URL for Twilio's WhatsApp webhook and for the frontend to
+   call) without depending on a laptop staying online through judging, which was the exact tradeoff the
+   original §5 flagged between its two options. A `t2.micro` burstable instance is sized against the
+   PRD's own traffic shape (a single-salon hackathon demo, not production scale — PRD NFR §7); nothing in
+   the PRD asks for sustained throughput that a burstable instance couldn't cover, so this is not
+   over- or under-provisioning relative to the stated requirement.
+2. **Frontend (`B2B_FE/`) — AWS S3 (private bucket) + CloudFront.** The Vite production build's static
+   output is deployed to a private S3 bucket, served through a CloudFront distribution in front of it for
+   HTTPS, SPA routing (redirecting unknown paths to `index.html`), and CDN distribution. This is a
+   managed-static-hosting pattern, not a compute service — it does not reintroduce the "full cloud
+   infrastructure" complexity the original recommendation ruled out; there is no server process to
+   operate for the frontend at all.
+3. **Database — AWS RDS (Postgres).** This was already implicit in the existing `docker-compose.yml`
+   (`DATABASE_URL` built from `RDS_HOST`/`RDS_USER`/`RDS_PASSWORD`/`RDS_DB`, per `.env.example`) — the
+   compose file never ran a local Postgres container. §3's recommendation of Postgres as the *engine* is
+   unchanged; this revision simply documents RDS as the already-decided hosting of that engine, so it is
+   no longer an undocumented gap between what the docs said and what the compose file actually pointed
+   at.
+
+**Alternatives not chosen, for the record:**
+- **Local + tunnel (the original default)** — not chosen for the finalized deployment: it would leave
+  the live demo dependent on a laptop and network connection staying up through judging, which is exactly
+  the risk the original §5 named as the reason a team might prefer the PaaS fallback instead. The team
+  went one step further than the PaaS fallback and provisioned real (if minimal) cloud infrastructure
+  instead.
+- **Single-service PaaS (Railway/Render/Fly.io)** — superseded by the EC2/S3+CloudFront/RDS combination
+  above; not rejected on the merits, simply not what was deployed. Nothing here suggests the PaaS option
+  was wrong for a team that preferred it — it remains a reasonable option for a similarly-scoped future
+  build.
+- **ECS/Fargate or managed Kubernetes** — still not used, still not recommended for this scope; the
+  finalized setup deliberately stays at "one instance, docker directly" rather than adding an
+  orchestrator, consistent with the original reasoning.
+
+**Open item — cross-origin calls (not resolved by this revision, recorded for the Developer/UX Designer
+to pick up):** the frontend currently calls the backend with relative paths (e.g. `fetch("/chat")`,
+`fetch("/dashboard/staff")`), and the backend has no CORS middleware. Under the finalized hosting,
+CloudFront (frontend origin) and EC2 (backend origin) are different origins, so relative-path fetches from
+the CloudFront-served frontend will not reach the EC2 backend as-is. Two compliant resolutions exist and
+neither is chosen here, since resolving it is implementation work, not a stack decision:
+- Add a CloudFront cache-behavior that routes the backend's path prefixes (e.g. `/chat`, `/dashboard/*`,
+  `/webhooks/*`) to the EC2 origin, keeping everything same-origin from the browser's perspective and
+  requiring no frontend or backend code change; or
+- Add CORS middleware on the FastAPI backend and switch the frontend's API client
+  (`B2B_FE/src/api/`, per base-rules.md's Architecture Constraints) to an absolute API base URL supplied
+  at build time.
+This is noted as an open item for whichever of the Developer or UX Designer agents next touches the
+frontend/backend boundary — it is not decided here, and downstream work should not assume either
+resolution without confirming which one was taken.
 
 ## 6. Key Libraries / Services
 
@@ -445,6 +516,13 @@ docker-compose.yml             # orchestration only — not application code; se
   still call the underlying FastAPI endpoints out-of-band, bypassing the LLM+tool-registry gate. This is
   an accepted risk given the NFR's explicit auth-minimalism, not a defect in this proposal, and this stack
   should not be described as "secure" beyond what a hackathon demo needs.
+- **Single-instance EC2 hosting** (per the §5 2026-09-18 revision) rules out, without later work,
+  zero-downtime deploys, horizontal backend scaling, or surviving an instance failure without manual
+  intervention — accepted deliberately for a single-demo hackathon build; would need revisiting (e.g. an
+  autoscaling group, a load balancer, or a managed-container service) for any sustained, post-hackathon
+  production use.
+- **Cross-origin frontend/backend split** (CloudFront + EC2, per the §5 2026-09-18 revision) is a known
+  open item, not yet resolved: see the "Open item — cross-origin calls" note under §5's revision block.
 
 ## 11. Open items for Gate 3
 
@@ -459,3 +537,12 @@ confirming §6.2's Sandbox recommendation already addresses it end-to-end (see t
 No open items remain against this document. Downstream: `stack/rules/base-rules.md` is now the locked
 coding-rules artifact derived from this approved stack; the UX Designer and Developer agents build
 against it, not against this proposal directly.
+
+**Post-approval revision (2026-09-18):** §5's demo-hosting recommendation was superseded by the team's
+actual deployment (AWS EC2 for the backend, S3+CloudFront for the frontend, AWS RDS for the database) —
+see §5's dated revision block and §10's added constraint bullet. This is recorded as a revision to an
+implementation-level recommendation within the already-approved stack, not a reopening of Gate 3 itself;
+no element of the approved stack (frontend/backend/database technologies, agent-to-tool boundary, WhatsApp
+integration approach, auth posture) changed. The cross-origin open item noted in §5 remains unresolved and
+is carried forward for the Developer/UX Designer agents to pick up.
+</content>

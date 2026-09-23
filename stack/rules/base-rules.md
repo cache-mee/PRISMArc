@@ -4,6 +4,13 @@ status: approved
 approved_date: 2026-09-17
 owner: Architect
 source: stack/stack-proposal.md (status: approved, 2026-09-17 — Gate 3)
+sign_off:
+  - date: 2026-09-17
+    note: "Initial lock at Gate 3 approval."
+  - date: 2026-09-18
+    note: "Infra row + 'No full cloud infrastructure' bullet updated to record the team's finalized
+      hackathon-demo hosting (AWS EC2 for B2B_BE, S3+CloudFront for B2B_FE, AWS RDS for the database),
+      per stack-proposal.md §5's dated 2026-09-18 revision. No other rule in this file changed."
 ---
 
 # Base Coding Rules
@@ -20,9 +27,9 @@ source: stack/stack-proposal.md (status: approved, 2026-09-17 — Gate 3)
 |---|---|---|
 | Frontend | React + TypeScript (Vite) | React 18+, TypeScript 5+, Vite 5+. One codebase serving both the Web Chat widget and the Owner Dashboard (`B2B_FE/`). |
 | Backend | FastAPI (Python) | Python 3.12+, FastAPI 0.11x+. One deployable service hosting both the Booking Agent and the Manager Agent (`B2B_BE/`). |
-| Database | PostgreSQL | 16+. Single primary store for domain data and conversation/session state. |
+| Database | PostgreSQL | 16+. Single primary store for domain data and conversation/session state. Hosted on AWS RDS (see Infra row — finalized 2026-09-18). |
 | Mobile | N/A | No native or cross-platform mobile app in scope for this MVP (stack-proposal.md §4). Do not build one speculatively. |
-| Infra | Docker Compose | One `Dockerfile` per top-level folder (`B2B_BE/`, `B2B_FE/`) plus a root `docker-compose.yml` orchestrating backend + frontend + Postgres. Demo hosting: local + tunnel (ngrok/Cloudflare Tunnel) as default, or a single-service PaaS (Railway/Render/Fly.io) as fallback. No managed-Kubernetes/ECS-class infra. |
+| Infra | Docker (backend) + managed static hosting (frontend) + managed DB | One `Dockerfile` per top-level folder (`B2B_BE/`, `B2B_FE/`). **Finalized hosting (2026-09-18, supersedes the original local+tunnel/PaaS demo-hosting language — stack-proposal.md §5 revision):** backend (`B2B_BE/`) runs its existing `Dockerfile` via `docker compose build`/`up` (backend service only) directly on a single AWS EC2 `t2.micro` instance; frontend (`B2B_FE/`) is a static Vite production build deployed to a private AWS S3 bucket served through AWS CloudFront; database is AWS RDS (Postgres), already wired via `docker-compose.yml`'s `DATABASE_URL` and `.env.example`'s `RDS_HOST`/`RDS_USER`/`RDS_PASSWORD`/`RDS_DB`. No managed-Kubernetes/ECS/Fargate-class orchestration. Known open item: the frontend calls the backend with relative paths and the backend has no CORS middleware — CloudFront and EC2 are different origins, so this needs either a CloudFront cache-behavior routing backend path prefixes to the EC2 origin, or CORS plus an absolute API base URL in the frontend build; unresolved as of this sign-off, see stack-proposal.md §5. |
 | WhatsApp channel | Twilio WhatsApp Sandbox + Twilio Python SDK | Sandbox, not a production WhatsApp Business Account, for this build. |
 | LLM provider | Not locked here | Any provider with a mature native tool/function-calling API (Anthropic Claude or OpenAI current-generation). Pin the specific model/provider in a config value once API keys are confirmed — this is an implementation detail, not an architecture lock. |
 
@@ -165,8 +172,14 @@ decision recorded as a decision entry or ADR, not an ad-hoc addition mid-impleme
   instead (stack-proposal.md §6.1). A lightweight structured-output convenience library
   (e.g., `pydantic-ai`, `instructor`) is permitted since it does not add a network hop or replace the
   direct-call pattern.
-- **No full cloud infrastructure** (AWS ECS/Fargate, managed Kubernetes, etc.) for this build. Docker
-  Compose plus local-and-tunnel or a single-service PaaS only.
+- **No ECS/Fargate/managed-Kubernetes-class infrastructure** for this build (updated 2026-09-18, per
+  stack-proposal.md §5's revision — see Infra row above for the finalized setup). The finalized hosting —
+  one AWS EC2 `t2.micro` instance running the backend's Dockerfile directly via `docker compose`, AWS
+  S3+CloudFront serving the frontend's static build, and AWS RDS for Postgres — is the approved,
+  now-deployed setup and does **not** fall under this prohibition: it does not introduce a container
+  orchestrator, autoscaling group, or multi-service cluster. The prohibition remains specifically against
+  adding ECS, Fargate, EKS/self-managed Kubernetes, or comparable orchestration-layer complexity on top of
+  this setup, not against the managed single-instance/static-hosting/managed-DB combination itself.
 
 ## Naming Conventions
 
@@ -240,9 +253,17 @@ requirement against the PRD first).
   before the tool body executes (type/shape validation is not optional even though deep defensive
   handling is out of scope) — this catches malformed LLM tool-call arguments as a normal Pydantic
   validation error, not a custom defensive layer.
-- **Secrets** (LLM provider API key, Twilio Account SID/Auth Token/WhatsApp number) are read from
-  environment variables via `app/config.py`, never hard-coded or committed. A `.env.example` (no real
-  values) documents the required variables; the real `.env` is git-ignored.
+- **Secrets** (LLM provider API key, Twilio Account SID/Auth Token/WhatsApp number, RDS credentials) are
+  read from environment variables via `app/config.py`, never hard-coded or committed. A `.env.example`
+  (no real values) documents the required variables; the real `.env` is git-ignored. This now includes
+  AWS credentials/RDS endpoint details used by the EC2-hosted backend (finalized 2026-09-18) — the same
+  no-hardcoding rule applies to them as to any other secret.
+- **Cross-origin exposure (open item, 2026-09-18):** with the frontend served from CloudFront and the
+  backend from EC2, the two are different origins. Until the routing/CORS open item noted in the Infra
+  row above is resolved, do not add ad-hoc `Access-Control-Allow-Origin: *` or other permissive CORS
+  configuration as a quick fix — either resolution path noted in the Infra row (CloudFront routing, or
+  CORS scoped to the actual frontend origin plus an absolute API base URL) is acceptable; a wildcard
+  origin is not, given the backend has no other access control in front of it.
 
 ## Dependency Policy
 
@@ -263,3 +284,4 @@ requirement against the PRD first).
   beyond that guardrail, but a dependency that would require its own infrastructure (a message queue, a
   vector store, a second database, a workflow engine) is out of scope and requires an Architect decision
   first, not an ad-hoc addition.
+</content>

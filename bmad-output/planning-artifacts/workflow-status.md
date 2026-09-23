@@ -35,13 +35,24 @@ forwarded rather than resolved unilaterally (SM-4a/b/c operator-hook mechanism, 
 gating, WhatsApp Sandbox interactive-button feasibility, and two non-blocking design-consistency
 notes) — see `.orchestration/runs/planning-salon-app/handoff.md` for the full list and owners.
 
+## Post-approval revisions
+
+- **2026-09-18** — Phase 3 (Tech Stack) revised, not reopened: `stack/stack-proposal.md` §5 finalizes
+  demo hosting as EC2 `t2.micro`+Docker (backend), S3+CloudFront (frontend), RDS Postgres (database),
+  superseding the original "local + tunnel / PaaS" recommendation. `stack/rules/base-rules.md` updated
+  to match (Infra row, Forbidden bullet, Secrets bullet), sign-off recorded in its frontmatter. Gate 3
+  itself was not reopened — the stack (React/FastAPI/Postgres/Twilio) is unchanged, only the hosting
+  mechanism. Open item carried forward: CloudFront/EC2 cross-origin `fetch()` calls + no CORS on the
+  backend, not yet resolved. Tracked in Jira: APPOINTMEN-61 (original APPOINTMEN-60 deleted by user, recreated as
+  APPOINTMEN-61). Branch: `chore/APPOINTMEN-60-finalize-hosting` (name unchanged; PR #66).
+
 ## Phase Status
 
 | Phase | Status | Artefact Path | Gate | Gate Status |
 |---|---|---|---|---|
 | 1 — Brief | done | bmad-output/planning-artifacts/briefs/brief-salon-app-2026-09-17/brief.md | Brief Approval | approved |
 | 2 — PRD | done | bmad-output/planning-artifacts/prd/prd-salon-app-2026-09-17/prd.md | (inline) | done |
-| 3 — Stack | done | stack/stack-proposal.md | Stack Approval | approved |
+| 3 — Stack | done (revised 2026-09-18) | stack/stack-proposal.md | Stack Approval | approved |
 | 4 — UX Design | done | bmad-output/planning-artifacts/ux/ux-salon-app-2026-09-17/ | Design Approval | pending |
 | 5 — Epics & Stories | done | bmad-output/planning-artifacts/epics/epics-salon-app-2026-09-17.md | (none) | — |
 | 6 — Confluence Push | done | | Push Summary | done — 8 pages created in space AP |

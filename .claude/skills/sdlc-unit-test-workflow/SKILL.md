@@ -9,10 +9,26 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill owns the unit test autho
 
 ## Conventions
 
-- `{project-root}` is the repository root.
+- `{project-root}` is the **main clone** — never a ticket's worktree, even if this workflow
+  happens to be invoked from inside one. `git rev-parse --show-toplevel` is ambiguous once
+  worktrees exist; the main clone is always the first `worktree` entry in
+  `git worktree list --porcelain`, run from anywhere. Resolve it once at activation.
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
+- `{worktree_path}` is the isolated git worktree `sdlc-dev-workflow` Phase 2 created for
+  `{branch_name}` — resolve it via the `worktree-add` skill (idempotent; returns the existing path
+  rather than creating anything new), never via a plain `git checkout {branch_name}` in
+  `{project-root}`, which fails once the branch is already checked out in that worktree. Resolve
+  it **before** touching `{plans_dir}` — the plan file lives inside it (see below). Every
+  git/build/test command this workflow runs against the implemented code also runs from
+  `{worktree_path}`; `{run_dir}` stays anchored to `{project-root}` as above.
+- `{plans_dir}` resolves to `{worktree_path}/development/plans/`. `development/plans/` is
+  git-tracked, so the plan file committed by `sdlc-dev-workflow` Phase 3 travels with the branch
+  into this worktree.
+- `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md` — written by
+  `sdlc-dev-workflow` Phase 3. This is the ticket's single source of truth (summary, acceptance
+  criteria, tasks, affected files); there is no separate `ticket.md` anywhere.
 - Tests are written **after** implementation — this workflow reads existing code and writes tests for it.
 - A **human gate** means: stop, present the artefact, wait for explicit approval before proceeding.
 - **Bounded recovery:** each phase gets one retry on failure before escalating.
@@ -40,7 +56,9 @@ Schema: `.orchestration/schemas/run-record.md`. Append to the existing `{run_rec
 than creating a new file.
 
 - On activation, set `State: unit-testing` in `{run_record}` (create the file per the schema
-  only if it genuinely does not exist yet — e.g. this workflow was invoked standalone).
+  only if it genuinely does not exist yet — e.g. this workflow was invoked standalone). If
+  creating it, stamp `Started:` = now, ISO-8601 (`date -u +%Y-%m-%dT%H:%M:%S+00:00`); if the
+  file already exists, leave its `Started:` untouched.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[unit-test] Phase N — Name` (or `[unit-test] Gate N — Name`), `Owner` = `test`, or exactly
   `human` for a gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` =
@@ -50,6 +68,21 @@ than creating a new file.
 - Do not advance `State` past `unit-testing` — `sdlc-qa-workflow` is what moves it to `qa`.
 - Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
   note it and continue.
+
+---
+
+## Status Artefacts (workflow-status)
+
+Schema: `.orchestration/schemas/ticket-status.md`.
+
+- After **every** phase and gate reply, update `current.md`'s five fields and `status.md`'s "You
+  Are Here" section and the matching Phase Tracker row for `sdlc-unit-test-workflow`.
+- Update this ticket's row in `.orchestration/PROJECT-STATUS.md`'s Active Tickets table (Current
+  Workflow = `sdlc-unit-test-workflow`, Phase = the phase just reached, Waiting On = the gate
+  question if one is pending, else "—"). If no row exists yet for `{ticket}` (this workflow was
+  invoked standalone, skipping `sdlc-dev-workflow`), create one.
+- Never let this slow down or gate the workflow itself. If these files cannot be written, note
+  it and continue.
 
 ---
 
@@ -70,8 +103,13 @@ than creating a new file.
    On `detail`: read `{run_dir}/status.md` and present in full, then ask resume/restart.
    Wait for the user's reply.
 4. Update `{run_dir}/current.md` — set workflow to `sdlc-unit-test-workflow`, phase to `Phase 1 — Code Reconnaissance`, status to `running`.
-5. Read `{run_dir}/implementation-plan.md` and `{run_dir}/ticket.md` to understand what was built.
-6. Confirm the branch is checked out: `git branch --show-current`. If not on `{branch_name}`, run `git checkout {branch_name}`.
+5. Resolve `{worktree_path}` for `{branch_name}` via the `worktree-add` skill
+   (`.claude/skills/worktree-add/SKILL.md`) — it returns the existing worktree rather than
+   recreating one. Confirm it: `git -C {worktree_path} branch --show-current` should print
+   `{branch_name}`. Do not run a plain `git checkout {branch_name}` in `{project-root}` — it fails
+   (or silently diverges) once the branch is checked out in the worktree. Resolve this **before**
+   step 6 — `{plan_file}` lives inside `{worktree_path}`.
+6. Read `{plan_file}` (`{plans_dir}/{ticket}-implementation-plan.md`) to understand what was built — it is the only ticket-context artefact `sdlc-dev-workflow` produces; there is no separate `ticket.md`.
 7. Begin at **Phase 1** (or the resume phase).
 
 ---
@@ -109,13 +147,13 @@ than creating a new file.
 
 **Owner:** Test agent (`.claude/agents/test.md`)
 **Skill:** `test-design`
-**Input:** `{run_dir}/implementation-plan.md` + all files listed in the plan's "Files to Modify / Create" sections
+**Input:** `{plan_file}` + all files listed in the plan's "Files to Modify / Create" sections
 
 ### Instructions
 
 1. Invoke the Test agent. Pass it:
-   - `{run_dir}/implementation-plan.md` — to understand what was implemented
-   - `{run_dir}/ticket.md` — for business context
+   - `{plan_file}` — to understand what was implemented and for business/ticket context (its
+     own Ticket Reference section covers what a separate `ticket.md` would have)
    - `stack/rules/base-rules.md` — for testing framework, coverage requirements, and conventions
 2. The Test agent reads every file named in the implementation plan. For each:
    - Identifies all public functions, methods, classes, or modules.
@@ -258,7 +296,9 @@ Reply with one of:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-Never run `git commit` or `git push` without the corresponding explicit reply.
+Run every `git log` / `git commit` / `git push` above from `{worktree_path}`, resolved in the
+On Activation step — never from `{project-root}`. Never run `git commit` or `git push` without the
+corresponding explicit reply.
 
 ---
 
@@ -279,11 +319,20 @@ Next step:
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
-Update `{run_dir}/status.md` — set `unit_tests: complete`.
+Update `{run_dir}/status.md` — set `unit_tests: complete`, mark all `sdlc-unit-test-workflow`
+Phase Tracker rows `✓`, and update this ticket's `PROJECT-STATUS.md` Active Tickets row: Current
+Workflow = `sdlc-qa-workflow` (next), Phase = `not started`, Waiting On = `—`.
 
 ---
 
 ## Stop Conditions
+
+Bounded recovery in this workflow follows the same `status.json` + `tools/breaker-check`
+convention defined in `sdlc-dev-workflow`'s "Bounded Recovery" section: on any retry, run
+`tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} --activity <key> --reason
+"<why>" --failure-signal "<signature>" --evidence "<path>"` (never hand-edit `status.json`), then
+run `tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}` before proceeding; a
+non-zero exit stops the retry.
 
 - User replies `stop` at any gate.
 - A source file listed in the plan does not exist on disk.

@@ -25,14 +25,14 @@ The result: a team where AI handles the mechanical work of each role — writing
 ║                        PRISM FRAMEWORK                           ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
-║   LAYER 1 — WORKFLOWS  (the pipelines you invoke)                ║
+║   LAYER 1 — WORKFLOW SKILLS  (own phase sequencing; the pipelines you invoke) ║
 ║   ┌─────────────────┐  ┌─────────────────────────────────────┐   ║
 ║   │ sdlc-planning   │  │         DEVELOPMENT SIDE            │   ║
 ║   │ ─────────────── │  │  sdlc-dev  →  unit-test  →  qa      │   ║
 ║   │ Idea → Jira     │  │  workflow     workflow     workflow  │   ║
 ║   └─────────────────┘  └─────────────────────────────────────┘   ║
 ║                                                                  ║
-║   LAYER 2 — AGENTS  (the role players)                           ║
+║   LAYER 2 — AGENTS  (the role players, invoked per phase)        ║
 ║   ┌──────────┐ ┌──────┐ ┌──────────┐ ┌──────┐ ┌──────────┐      ║
 ║   │Business  │ │Prod. │ │Architect │ │  UX  │ │Developer │      ║
 ║   │Analyst   │ │Mgr   │ │          │ │Design│ │          │      ║
@@ -41,7 +41,7 @@ The result: a team where AI handles the mechanical work of each role — writing
 ║   │  Test    │ │ Reviewer │                                      ║
 ║   └──────────┘ └──────────┘                                      ║
 ║                                                                  ║
-║   LAYER 3 — SKILLS  (bounded capabilities each agent uses)       ║
+║   LAYER 3 — CAPABILITY SKILLS  (bounded capabilities each agent uses) ║
 ║   bmad-product-brief · bmad-prd · bmad-architecture · bmad-ux    ║
 ║   bmad-create-epics-and-stories · bmad-build · test-design       ║
 ║                                                                  ║
@@ -63,8 +63,8 @@ The result: a team where AI handles the mechanical work of each role — writing
 ### 1. Agents = Role Players
 Each agent knows its domain and nothing else. The Business Analyst doesn't write code. The Developer doesn't design UX. Each agent reads the output of the previous one as its input.
 
-### 2. Skills = Bounded Capabilities
-A skill is a single, reusable capability. An agent invokes a skill to do a specific job — writing a brief, designing tests, implementing a task. Skills don't make workflow decisions; agents do.
+### 2. Skills = Two Kinds
+**Capability skills** are a single, reusable capability an agent invokes for one job — writing a brief, designing tests, implementing a task — and never decide what runs next. **Workflow skills** (Layer 1: `sdlc-*-workflow`) are the one named exception — each owns the fixed phase sequence of its own SDLC workflow and invokes the applicable agent per phase.
 
 ### 3. Gates = Human Control Points
 Every workflow stops at a gate and waits for your explicit reply before proceeding. Gates are never optional. This is how humans stay in control of an AI-powered pipeline.

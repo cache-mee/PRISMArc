@@ -9,10 +9,23 @@ Orchestration rules: `.claude/STANDARDS.md`. This skill is owned by QA — not t
 
 ## Conventions
 
-- `{project-root}` is the repository root.
+- `{project-root}` is the **main clone** — never a ticket's worktree, even if this workflow
+  happens to be invoked from inside one. `git rev-parse --show-toplevel` is ambiguous once
+  worktrees exist; the main clone is always the first `worktree` entry in
+  `git worktree list --porcelain`, run from anywhere. Resolve it once at activation.
 - `{ticket}` is the Jira issue key (e.g. `PROJ-42`).
 - `{run_dir}` resolves to `{project-root}/.orchestration/runs/{ticket}/`.
 - `{run_record}` resolves to `{run_dir}/run-record.md`.
+- `{worktree_path}` is the isolated git worktree `sdlc-dev-workflow` Phase 2 created for
+  `{branch_name}` — resolve it via the `worktree-add` skill (idempotent; returns the existing path
+  rather than creating anything new) before Phase 1. Every test file this workflow writes, and
+  every command it runs against the implemented code, runs from `{worktree_path}`; `{run_dir}`
+  stays anchored to `{project-root}`.
+- `{plans_dir}` resolves to `{worktree_path}/development/plans/`. `development/plans/` is
+  git-tracked, so the plan file committed by `sdlc-dev-workflow` Phase 3 travels with the branch
+  into this worktree.
+- `{plan_file}` resolves to `{plans_dir}/{ticket}-implementation-plan.md` — written by
+  `sdlc-dev-workflow` Phase 3; the ticket's single source of truth. There is no `ticket.md`.
 - `{pr_url}` is the GitHub PR URL for this ticket.
 - Integration tests test **boundaries** — two or more real components working together. They do not mock everything; they mock only external services (third-party APIs, email, payments).
 - A **human gate** means: stop, present the artefact, wait for explicit approval. Never reinterpret a gate as optional.
@@ -41,7 +54,9 @@ than creating a new file.
 
 - On activation, set `State: qa` in `{run_record}` (create the file per the schema only if it
   genuinely does not exist yet — e.g. QA is on a different machine and this is the first
-  workflow to touch this ticket).
+  workflow to touch this ticket). If creating it, stamp `Started:` = now, ISO-8601
+  (`date -u +%Y-%m-%dT%H:%M:%S+00:00`); if the file already exists, leave its `Started:`
+  untouched.
 - After **every** phase below completes, and after every gate reply, append one row: `Step` =
   `[qa] Phase N — Name` (or `[qa] Gate N — Name`), `Owner` = `test`, or exactly `human` for a
   gate reply, `Outcome` = `done` / `failed` / `awaiting`, `Evidence` = `commit:<sha>` /
@@ -54,6 +69,28 @@ than creating a new file.
   `{run_record}` rather than starting a new one.
 - Never let this slow down or gate the workflow itself. If `{run_record}` cannot be written,
   note it and continue.
+
+---
+
+## Status Artefacts (workflow-status)
+
+Schema: `.orchestration/schemas/ticket-status.md`.
+
+- After **every** phase and gate reply, update `current.md`'s five fields and `status.md`'s "You
+  Are Here" section and the matching Phase Tracker row for `sdlc-qa-workflow`.
+- Update this ticket's row in `.orchestration/PROJECT-STATUS.md`. While QA is in progress, keep
+  it in the **Active Tickets** table (Current Workflow = `sdlc-qa-workflow`, Phase = the phase
+  just reached, Waiting On = the gate question if pending, else "—"). If no row exists yet
+  (invoked standalone), create one.
+- **On PASS** (Phase 4): move the ticket's row from **Active Tickets** to **Completed Tickets**
+  (Ticket, Summary, Branch, PR, QA Verdict = `PASS`, Completed = today's date). Remove any row
+  for it from **Blocked / Needs Work** if one exists from a prior FAIL.
+- **On FAIL** (Phase 4): keep the row in **Active Tickets** (Waiting On = "developer fix"), and
+  add/update a row in **Blocked / Needs Work** (Blocked At = `sdlc-qa-workflow Phase 4`, Reason =
+  a one-line summary of the failing ACs, Action Required = "fix failing tests, push, re-run
+  `/sdlc-qa-workflow {ticket}`").
+- Never let this slow down or gate the workflow itself. If these files cannot be written, note
+  it and continue.
 
 ---
 
@@ -74,8 +111,13 @@ than creating a new file.
    On `detail`: read `{run_dir}/status.md` and present in full, then ask resume/restart.
    Wait for QA's reply.
 4. Update `{run_dir}/current.md` — set workflow to `sdlc-qa-workflow`, phase to `Phase 1 — Feature Understanding`, status to `running`.
-5. Confirm GitHub CLI access: `gh pr view {pr_url}` — if this fails, fall back to `git diff {default_branch}...{branch_name}`.
-6. Begin at **Phase 1** (or the resume phase).
+5. Confirm GitHub CLI access and derive `{branch_name}`: `gh pr view {pr_url} --json headRefName,baseRefName` — if this fails, ask the user for `{branch_name}` directly. `{default_branch}` is the PR's base ref from that same call, or `git remote show origin | grep "HEAD branch"` if the PR lookup failed.
+6. Resolve `{worktree_path}` for `{branch_name}` via the `worktree-add` skill
+   (`.claude/skills/worktree-add/SKILL.md`) — it returns the existing worktree `sdlc-dev-workflow`
+   Phase 2 already created rather than making a new one. Every file this workflow reads or writes
+   for this ticket (the plan file, the integration tests themselves) lives under `{worktree_path}`
+   from here on, never `{project-root}`.
+7. Begin at **Phase 1** (or the resume phase).
 
 ---
 
@@ -123,7 +165,7 @@ than creating a new file.
 2. Fetch the PR diff:
    - Run `gh pr diff {pr_url}` or `git diff {default_branch}...{branch_name}`
    - Identify which files changed and what the change does at a high level
-3. Read `{run_dir}/implementation-plan.md` if available — the approved plan describes intended component interactions.
+3. Read `{plan_file}` (`{plans_dir}/{ticket}-implementation-plan.md`) if it exists — the approved plan describes intended component interactions. There is no separate `ticket.md`; the plan file's Ticket Reference section covers that.
 4. Read `stack/rules/base-rules.md` for testing framework, conventions, and what counts as a component boundary in this project.
 5. Produce a brief feature summary saved to `{run_dir}/qa-feature-summary.md`:
    - What the feature does (from the ticket)
@@ -202,6 +244,9 @@ Do not write a single test until the QA replies `approved`.
 **Skill:** `bmad-build` (one invocation per test file)
 **Input:** Approved `{run_dir}/integration-test-plan.md`
 
+All test files are created/updated and all test/build commands below run inside
+`{worktree_path}` (resolved On Activation) — never in `{project-root}`.
+
 ### Instructions
 
 1. For each acceptance criterion in the approved plan:
@@ -262,16 +307,30 @@ All integration tests passed.
 
 Actions:
   → Jira comment added
-  → Ticket transitioned to: Ready for Merge (or equivalent)
+  → Ticket transitioned to the real terminal (done-category) Jira status
 ──────────────────────────────────────────────────────────────────────────────
 ```
 
 2. Call `mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue`:
    > "QA PASS — {N}/{N} integration tests passed. PR: {pr_url}. Results: {run_dir}/qa-results.md"
 
-3. Call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue` → find "Ready for Merge" or "Done" or the closest equivalent.
-4. Call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` to move the ticket.
-5. Update `{run_dir}/status.md` — set `qa: passed`.
+3. Transition Jira to the real terminal status — **match by status category, not by name**:
+   - Call `mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue`. Status *names* vary per
+     project ("Done", "Ready for UAT", "Ready for Merge", "Released" all exist across different
+     Jira setups) but every one of them reports `to.statusCategory.key`, and only `"done"` means
+     Jira actually counts the issue as finished — `"new"` and `"indeterminate"` do not, even when
+     the status is *named* something that sounds terminal (e.g. a status literally called
+     "QA Done" can still carry `statusCategory.key: "indeterminate"`).
+   - Prefer any available transition whose target `statusCategory.key == "done"`. Call
+     `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` for it.
+   - If no available transition leads directly to a `done`-category status, take the best
+     available transition toward it (an intermediate in-progress status), then call
+     `getTransitionsForJiraIssue` again from the new status and repeat — up to 3 hops total.
+     Stop and report to the user if 3 hops are exhausted without reaching `done`-category, rather
+     than settling for an intermediate status and calling it final.
+   - Record every hop as its own `run-record.md` evidence entry (`jira:transitioned:<status
+     name>`), not just the last one.
+4. Update `{run_dir}/status.md` — set `qa: passed`, per **Status Artefacts** above.
 
 ### On FAIL (one or more tests fail)
 
@@ -298,8 +357,8 @@ Actions:
 ```
 
 2. Call `mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue` with the failure details listed above.
-3. Find and call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` to move the ticket to "Needs Work" or equivalent.
-4. Update `{run_dir}/status.md` — set `qa: failed`.
+3. Find and call `mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue` to move the ticket to "Needs Work" or equivalent — an in-progress-category status, never a `done`-category one.
+4. Update `{run_dir}/status.md` — set `qa: failed`, per **Status Artefacts** above.
 
 The developer must fix the failures and re-raise the PR. QA re-runs `/sdlc-qa-workflow {ticket}` to re-validate.
 
@@ -316,6 +375,13 @@ The developer must fix the failures and re-raise the PR. QA re-runs `/sdlc-qa-wo
 ---
 
 ## Stop Conditions
+
+Bounded recovery in this workflow follows the same `status.json` + `tools/breaker-check`
+convention defined in `sdlc-dev-workflow`'s "Bounded Recovery" section: on any retry, run
+`tools/breaker-check/breaker-check record-attempt --run-dir {run_dir} --activity <key> --reason
+"<why>" --failure-signal "<signature>" --evidence "<path>"` (never hand-edit `status.json`), then
+run `tools/breaker-check/breaker-check --run-dir {run_dir} --ticket {ticket}` before proceeding; a
+non-zero exit stops the retry.
 
 - QA replies `stop` at any gate.
 - PR diff cannot be fetched (ticket and PR URL not accessible).

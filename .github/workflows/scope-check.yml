@@ -8,13 +8,16 @@ name: Scope Check
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
 
 jobs:
   scope-check:
+    # develop → main is a release merge of already-validated changes; skip it.
+    # All other PRs (feature → develop, hotfix → main) are checked.
+    if: "!(github.base_ref == 'main' && github.head_ref == 'develop')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

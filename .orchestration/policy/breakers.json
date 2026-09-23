@@ -1,8 +1,8 @@
 {
   "version": 1,
   "purpose": "Explicit, testable circuit breakers. Each trigger is evaluable against .orchestration/runs/<WORK-ID>/status.json and its evidence records. Agents MUST NOT edit this file to get past a breaker.",
-  "enforcement": "convention_only",
-  "enforcement_note": "No runtime evaluates these today. Triggers are written to be checkable so that a future deterministic check can prove a breaker stops execution. That proof does not exist yet.",
+  "enforcement": "partially_mechanical",
+  "enforcement_note": "tools/breaker-check evaluates attempt-limit, no-progress, evidence-conflict, gate-encountered and handoff-insufficient against a run's status.json (via `breaker-check --run-dir ...`), and budget-exceeded against tools/agent-metrics (via `--ticket`). It is invoked from .claude/agents/lead.md and all four sdlc-*-workflow skills before any retry is granted. scope-expansion is not mechanically checked here — .claude/hooks/gate-guard.py blocks the Bash-detectable subset of gates.json instead (a related but separate concern), and genuine scope-expansion still requires human judgement.",
   "breakers": [
     {
       "id": "attempt-limit",
@@ -33,6 +33,11 @@
       "id": "handoff-insufficient",
       "trips_when": "a required handoff field is missing, or references an evidence path that does not exist",
       "action": "stop_and_request_repair"
+    },
+    {
+      "id": "budget-exceeded",
+      "trips_when": "cumulative cost_usd for the ticket (from tools/agent-metrics report --json) exceeds budget-limits.json's ceiling_usd",
+      "action": "stop_and_escalate"
     }
   ]
 }

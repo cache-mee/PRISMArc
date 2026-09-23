@@ -27,11 +27,12 @@ not exactly six cells is silently skipped — never guessed at — so match this
 # {WORK-ID} — run record
 <!-- Appended by every sdlc-*-workflow phase and gate that touches this work. Do not hand-edit. -->
 
-Issue:  {ticket key, e.g. PROJ-42 — or the project name for a planning-cycle record}
-Branch: {branch name, or "n/a" before Phase 2 creates one}
-State:  {see State values below}
-Next:   {exact next action, one line}
-Task:   {optional — path to the planning-cycle run-record.md this ticket originated from}
+Issue:   {ticket key, e.g. PROJ-42 — or the project name for a planning-cycle record}
+Branch:  {branch name, or "n/a" before Phase 2 creates one}
+State:   {see State values below}
+Next:    {exact next action, one line}
+Started: {ISO-8601, stamped once when this file is first created — never updated after}
+Task:    {optional — path to the planning-cycle run-record.md this ticket originated from}
 
 | # | Step | Owner | Outcome | Evidence | At |
 |---|---|---|---|---|---|
@@ -41,6 +42,14 @@ Task:   {optional — path to the planning-cycle run-record.md this ticket origi
 ## Field rules
 
 - **Issue / Branch / Next** — updated in place; always reflect current reality, not history.
+- **Started** — written once, by whichever workflow phase creates this file, and never touched
+  again. It is the anchor `runrecord.py` uses as the lower bound of the **first** step's cost
+  window — without it, a first step has no earlier row to bound its start, so telemetry joined
+  to it (via the persistent-collector bridge — see `tools/agent-metrics/providers/otelpersistent.py`)
+  would otherwise cover everything the collector ever logged up to that step's timestamp, not
+  just that step's work. A record written before this field existed simply omits it; `metrics
+  task` then reports that record's first step as an upper-bound estimate rather than a
+  measurement, same as it always has.
 - **State** — one of: `planning` · `in-development` · `unit-testing` · `qa` · `complete` ·
   `stopped`. Whichever workflow is currently active sets it on entry and again on handoff to
   the next workflow. This is what makes the record read as one continuous SDLC journey instead
@@ -52,10 +61,13 @@ Task:   {optional — path to the planning-cycle run-record.md this ticket origi
   `[unit-test]`, `[qa]` — followed by the phase name exactly as that workflow's own pipeline
   names it (e.g. `[dev] Phase 3 — Implementation Plan`). The tag is what lets one file show
   which workflow produced which row; nothing else in the record says so.
-- **Owner** — the acting agent's name (`lead`, `business-analyst`, `product-manager`,
-  `architect`, `ux-designer`, `developer`, `test`, `reviewer`), or exactly `human` for a gate
-  reply. `runrecord.py` only counts a row as a human intervention when `Owner` is exactly
-  `human` — any other spelling silently is not counted.
+- **Owner** — the acting agent's name (`business-analyst`, `product-manager`, `architect`,
+  `ux-designer`, `developer`, `test`, `reviewer`), or exactly `human` for a gate reply. `lead` is
+  also a valid value, but denotes a workflow skill's own orchestrator acting directly for a phase
+  with no dedicated role agent (e.g. `sdlc-dev-workflow` Phases 1–2) — it does not mean the
+  `.claude/agents/lead.md` Lead Agent was invoked; none of the four workflow skills invoke it.
+  `runrecord.py` only counts a row as a human intervention when `Owner` is exactly `human` — any
+  other spelling silently is not counted.
 - **Outcome** — `done`, `failed`, or `awaiting` (a gate not yet answered).
 - **Evidence** — a short reference, not a transcript: `commit:<sha>`, `exit:<code>:<command>`,
   `jira:transitioned`, `approved`, `pr:<url>`, or a path. `runrecord.py` reads `exit:<code>:`
