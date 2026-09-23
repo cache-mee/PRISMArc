@@ -3,15 +3,13 @@
 <br/>
 
 ```
-██████╗ ██████╗ ██╗███████╗███╗   ███╗
-██╔══██╗██╔══██╗██║██╔════╝████╗ ████║
-██████╔╝██████╔╝██║███████╗██╔████╔██║
-██╔═══╝ ██╔══██╗██║╚════██║██║╚██╔╝██║
-██║     ██║  ██║██║███████║██║ ╚═╝ ██║
-╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝     ╚═╝
+██████╗ ██████╗ ██╗███████╗███╗   ███╗ █████╗ ██████╗  ██████╗
+██╔══██╗██╔══██╗██║██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔════╝
+██████╔╝██████╔╝██║███████╗██╔████╔██║███████║██████╔╝██║     
+██╔═══╝ ██╔══██╗██║╚════██║██║╚██╔╝██║██╔══██║██╔══██╗██║     
+██║     ██║  ██║██║███████║██║ ╚═╝ ██║██║  ██║██║  ██║╚██████╗
+╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝
 ```
-
-### **P**lanning · **R**eview · **I**mplementation · **S**tatus · **M**anagement
 
 *An agent-orchestrated SDLC, running on a deterministic execution harness*
 
@@ -36,7 +34,7 @@
 
 ## 1. What We Built
 
-PRISM is two things, layered together:
+PRISMARC is two things, layered together:
 
 1. An **agent-orchestrated SDLC** — BA, PM, Architect, UX Designer, Developer,
    Test and Reviewer sit on fixed workflow pipelines; Lead, Security and
@@ -176,7 +174,7 @@ NEXT AGENT DECISION
 
 ```
 ╔══════════════════════════════════════════════════════════════════╗
-║                        PRISM FRAMEWORK                           ║
+║                       PRISMARC FRAMEWORK                         ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
 ║   ◈ LAYER 1 — WORKFLOW SKILLS  (own phase sequencing)            ║
@@ -349,6 +347,6 @@ salon-app/
 
 <div align="center">
 
-*Built with [Claude Code](https://claude.ai/code) · Powered by PRISM*
+*Built with [Claude Code](https://claude.ai/code) · Powered by PRISMARC*
 
 </div>
