@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { fetchDashboardBookings } from "../api/dashboardBookings";
 import type { BookingEntry, DashboardView } from "../api/dashboardBookings";
 
+const EMPTY_STATE_MESSAGE: Record<DashboardView, string> = {
+  today: "No bookings today",
+  week: "No bookings this week",
+};
+
 function formatStartTime(startTime: string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -80,7 +85,9 @@ function BookingsList() {
         </div>
 
         {groupedBookings.size === 0 ? (
-          <p className="mt-6 text-sm text-ink-muted">No bookings</p>
+          <p className="mt-6 text-sm text-ink-muted">
+            {EMPTY_STATE_MESSAGE[view]}
+          </p>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             {Array.from(groupedBookings.entries()).map(
